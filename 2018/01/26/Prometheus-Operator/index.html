@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="en-US">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=6.2.0" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=6.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=6.2.0" color="#222">
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '6.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="prometheus-operator promethues-operator是一个通过监听K8s内CRD资源的变更操作事件来自动创建，配置并管理prometheus监控系统的一个控制器，可以理解成是一个类似于controller-manager的东西，只不过它的管理对象不是ds/deploy/sts/svc等  官网/github  整套方案包括以下组件  prometheus promethe">
+<meta name="keywords" content="prometheus">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Prometheus Operator">
+<meta property="og:url" content="https://fengxsong.github.io/2018/01/26/Prometheus-Operator/index.html">
+<meta property="og:site_name" content="Dummy.">
+<meta property="og:description" content="prometheus-operator promethues-operator是一个通过监听K8s内CRD资源的变更操作事件来自动创建，配置并管理prometheus监控系统的一个控制器，可以理解成是一个类似于controller-manager的东西，只不过它的管理对象不是ds/deploy/sts/svc等  官网/github  整套方案包括以下组件  prometheus promethe">
+<meta property="og:locale" content="en-US">
+<meta property="og:image" content="https://prometheus.io/assets/architecture.svg">
+<meta property="og:updated_time" content="2018-04-27T03:23:27.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Prometheus Operator">
+<meta name="twitter:description" content="prometheus-operator promethues-operator是一个通过监听K8s内CRD资源的变更操作事件来自动创建，配置并管理prometheus监控系统的一个控制器，可以理解成是一个类似于controller-manager的东西，只不过它的管理对象不是ds/deploy/sts/svc等  官网/github  整套方案包括以下组件  prometheus promethe">
+<meta name="twitter:image" content="https://prometheus.io/assets/architecture.svg">
+
+
+
+
+
+
+  <link rel="canonical" href="https://fengxsong.github.io/2018/01/26/Prometheus-Operator/"/>
+
+
+
+<script type="text/javascript" id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>Prometheus Operator | Dummy.</title>
+  
+
+
+
+
+
+
+
+
+
+  <noscript>
+  <style type="text/css">
+    .use-motion .motion-element,
+    .use-motion .brand,
+    .use-motion .menu-item,
+    .sidebar-inner,
+    .use-motion .post-block,
+    .use-motion .pagination,
+    .use-motion .comments,
+    .use-motion .post-header,
+    .use-motion .post-body,
+    .use-motion .collection-title { opacity: initial; }
+
+    .use-motion .logo,
+    .use-motion .site-title,
+    .use-motion .site-subtitle {
+      opacity: initial;
+      top: initial;
+    }
+
+    .use-motion {
+      .logo-line-before i { left: initial; }
+      .logo-line-after i { right: initial; }
+    }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en-US">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Dummy.</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Pretend to be a gopher.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+    <a href="/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-home"></i> <br />Home</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-about">
+    <a href="/about/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-user"></i> <br />About</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+    <a href="/tags/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />Tags</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-categories">
+    <a href="/categories/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-th"></i> <br />Categories</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+    <a href="/archives/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />Archives</a>
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/01/26/Prometheus-Operator/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Prometheus Operator
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-01-26 18:30:41" itemprop="dateCreated datePublished" datetime="2018-01-26T18:30:41+08:00">2018-01-26</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-27 11:23:27" itemprop="dateModified" datetime="2018-04-27T11:23:27+08:00">2018-04-27</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/prometheus/" itemprop="url" rel="index"><span itemprop="name">prometheus</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="prometheus-operator"><a href="#prometheus-operator" class="headerlink" title="prometheus-operator"></a>prometheus-operator</h3><blockquote>
+<p>promethues-operator是一个通过监听K8s内CRD资源的变更操作事件来自动创建，配置并管理prometheus监控系统的一个控制器，可以理解成是一个类似于controller-manager的东西，只不过它的管理对象不是ds/deploy/sts/svc等</p>
+</blockquote>
+<p><a href="https://coreos.com/operators/prometheus/docs/latest/" target="_blank" rel="noopener">官网</a>/<a href="https://github.com/coreos/prometheus-operator" target="_blank" rel="noopener">github</a></p>
+<hr>
+<p>整套方案包括以下组件</p>
+<ul>
+<li><p><a href="https://prometheus.io" target="_blank" rel="noopener">prometheus</a></p>
+<p>prometheus是一个开源的监控告警系统，具有由度量名称和键/值对标识的时间序列数据的多维数据模型、灵活的查询语言，监控模式是通过HTTP主动去拉取exporters上基于时间序列的监控采集数据，同时也能通过中间网关来支持推送型的监控数据收集，所有的监控目标都是通过配置型的或是服务发现，或是静态配置，提供了HTTP页面支持图形和仪表盘的展示。</p>
+<p>  <img src="https://prometheus.io/assets/architecture.svg" alt=""></p>
+</li>
+</ul>
+<ul>
+<li><p><a href="https://prometheus.io/docs/alerting/alertmanager/" target="_blank" rel="noopener">alertmanager</a></p>
+<p>alertmanager处理由客户端应用程序发送的prometheus警报，将重复的告警信息通过特定的标签去分组，并将它们路由到正确的接收方，特点是能够grouping、抑制、设置静默等。</p>
+</li>
+<li><p><a href="https://github.com/fengxsong/dingtalk" target="_blank" rel="noopener">一个简单的钉钉机器人</a></p>
+<p>从alertmanager通过webhook的方式发送告警信息，将payload渲染成配置好的模板，并发送到指定的钉钉机器人</p>
+</li>
+<li><p><a href="https://grafana.com/" target="_blank" rel="noopener">grafana</a></p>
+<p>有了prometheus去收集数据，那我们还需要将这些metrics通过web页面展示出来，那grafana就是这样的一个工具，它支持多种数据源，能让你查询、展示或者基于这些告警数据来发送警报（虽然也支持prometheus数据源但是我们并没有使用到），最实用的是它在社区有维护了很多开箱即用的面板模板，只需要少少的修改就能展示出一个很详细的展示面板出来。当然，它也实现了自己的一套DSL语言。</p>
+</li>
+<li><p><a href="https://github.com/prometheus/node_exporter" target="_blank" rel="noopener">node-exporter</a></p>
+<p>一个golang写的能够采集硬件以及OS信息的收集器，采集目标包括cpu/硬盘/conntrack/文件系统/负载/网络连接信息/硬件信息等，在K8S内使用daemonSet的方式运行，保证每台节点主机都能监控起自身的信息</p>
+</li>
+<li><p><a href="https://github.com/google/cadvisor" target="_blank" rel="noopener">cadvisor</a></p>
+<p>示例中的prometheus-operator生成的监控目标包含了cadvisor<br>虽然K8S组件kubelet编译包含了cadvisor，但是默认是不启用的。<br>cadvisor也是通过HTTP的方式暴露了节点主机上的资源使用率、性能指标以及运行的容器信息</p>
+</li>
+<li><p><a href="https://github.com/kubernetes/kube-state-metrics" target="_blank" rel="noopener">kube-state-metrics</a></p>
+<p>这个插件通过去APISERVER获取K8S内对象并生成对象对应的监控数据，例如nodes、pods、deployments等，具体可查阅[文档][10]</p>
+</li>
+<li><p>当然还有各个组件自带的metrics</p>
+</li>
+</ul>
+<p>其实倒数四个都是属于采集器，负责收集对应系统组件的信息。</p>
+<h3 id="部署"><a href="#部署" class="headerlink" title="部署"></a>部署</h3><figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">git clone https://github.com/coreos/prometheus-operator</span><br><span class="line">cd prometheus-operator/contrib/kube-prometheus/</span><br><span class="line">bash hack/cluster-monitoring/deploy</span><br></pre></td></tr></table></figure>
+<h3 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h3><p>prometheus-operator使用了k8s1.8+引入的CRD(custom resource definitions)，实现了controller的功能，通俗点来说，它负责将resource definition转换成K8S里的statefulset或者是promethues的配置对象。</p>
+<ul>
+<li><p><a href="https://github.com/coreos/prometheus-operator/blob/master/example/prometheus-operator-crd/prometheus.crd.yaml" target="_blank" rel="noopener">Prometheus</a></p>
+<p><code>Operator</code>会<code>ListWatch</code>集群内的<code>Prometheus CRD</code>来创建一个合适的<code>statefulset</code>在<code>monitoring</code>(.metadata.namespace指定)命名空间，并且挂载了一个名为<code>prometheus-k8s</code>的<code>Secret</code>为Volume到<code>/etc/prometheus/config</code>目录，<code>Secret</code>的data包含了以下内容</p>
+<ul>
+<li>configmaps.json指定了rule-files在configmap的名字</li>
+<li>prometheus.yaml为主配置文件</li>
+</ul>
+</li>
+<li><p><a href="https://github.com/coreos/prometheus-operator/blob/master/example/prometheus-operator-crd/servicemonitor.crd.yaml" target="_blank" rel="noopener">ServiceMonitor</a></p>
+<p>这个允许动态地监听K8S里的<code>Service</code>，会将生成的job更新到上面的<code>prometheus-k8s</code>这个<code>Secret</code>的 <code>Data.**prometheus.yaml**</code>里，然后prometheus这个pod里的sidecar容器<code>prometheus-config-reloader</code>当检测到挂载路径的文件发生改变后自动去执行HTTPPost请求到<code>/api/-reload-</code>路径去reload配置</p>
+</li>
+<li><p><a href="https://github.com/coreos/prometheus-operator/blob/master/example/prometheus-operator-crd/alertmanager.crd.yaml" target="_blank" rel="noopener">Alertmanager</a></p>
+<p>这个将生成一个<code>statefulset</code>类型对象，并挂载了名为<code>alertmanager-main</code>的<code>secret</code>资源到容器内部的<code>/etc/alertmanager/config/alertmanager.yaml</code>路径。当需要更新配置文件时需要将<code>alertmanager.yaml</code>内容base64encode后更新到<code>alertmanager-main</code>的<code>Data</code>属性或者直接patch secret from file</p>
+</li>
+</ul>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/prometheus/" rel="tag"># prometheus</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/01/18/Expanding-PVC/" rel="next" title="Expanding PVC">
+                <i class="fa fa-chevron-left"></i> Expanding PVC
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/01/29/使用ceph-exporter监控ceph集群/" rel="prev" title="使用ceph-exporter监控ceph集群">
+                使用ceph-exporter监控ceph集群 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">fengxsong</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">21</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-categories">
+                  <a href="/categories/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">3</span>
+                    <span class="site-state-item-name">categories</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  <a href="/tags/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">13</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  <a href="https://github.com/fengxsong" target="_blank" title="GitHub"><i class="fa fa-fw fa-github"></i></a>
+                  
+                </span>
+              
+                <span class="links-of-author-item">
+                  <a href="https://twitter.com/fengxsong" target="_blank" title="Twitter"><i class="fa fa-fw fa-twitter"></i></a>
+                  
+                </span>
+              
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#prometheus-operator"><span class="nav-text">prometheus-operator</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#部署"><span class="nav-text">部署</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#架构设计"><span class="nav-text">架构设计</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">fengxsong</span>
+
+  
+
+  
+</div>
+
+
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> v3.7.1</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/theme-next/hexo-theme-next">NexT.Gemini</a> v6.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=6.2.0"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=6.2.0"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=6.2.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=6.2.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=6.2.0"></script>
+
+
+
+  
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="en-US">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=6.2.0" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=6.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=6.2.0" color="#222">
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '6.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="更新April.20 Update:可参考或是直接试用caicloud的开源实现 loadbalancer-controller April.4 Update: 尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，">
+<meta name="keywords" content="k8s,ipvs">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IngressController与IPVS">
+<meta property="og:url" content="https://fengxsong.github.io/2017/11/15/IngressController与IPVS/index.html">
+<meta property="og:site_name" content="Dummy.">
+<meta property="og:description" content="更新April.20 Update:可参考或是直接试用caicloud的开源实现 loadbalancer-controller April.4 Update: 尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，">
+<meta property="og:locale" content="en-US">
+<meta property="og:updated_time" content="2018-04-27T04:24:43.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="IngressController与IPVS">
+<meta name="twitter:description" content="更新April.20 Update:可参考或是直接试用caicloud的开源实现 loadbalancer-controller April.4 Update: 尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，">
+
+
+
+
+
+
+  <link rel="canonical" href="https://fengxsong.github.io/2017/11/15/IngressController与IPVS/"/>
+
+
+
+<script type="text/javascript" id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>IngressController与IPVS | Dummy.</title>
+  
+
+
+
+
+
+
+
+
+
+  <noscript>
+  <style type="text/css">
+    .use-motion .motion-element,
+    .use-motion .brand,
+    .use-motion .menu-item,
+    .sidebar-inner,
+    .use-motion .post-block,
+    .use-motion .pagination,
+    .use-motion .comments,
+    .use-motion .post-header,
+    .use-motion .post-body,
+    .use-motion .collection-title { opacity: initial; }
+
+    .use-motion .logo,
+    .use-motion .site-title,
+    .use-motion .site-subtitle {
+      opacity: initial;
+      top: initial;
+    }
+
+    .use-motion {
+      .logo-line-before i { left: initial; }
+      .logo-line-after i { right: initial; }
+    }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en-US">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Dummy.</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Pretend to be a gopher.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+    <a href="/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-home"></i> <br />Home</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-about">
+    <a href="/about/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-user"></i> <br />About</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+    <a href="/tags/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />Tags</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-categories">
+    <a href="/categories/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-th"></i> <br />Categories</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+    <a href="/archives/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />Archives</a>
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2017/11/15/IngressController与IPVS/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">IngressController与IPVS
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2017-11-15 18:07:09" itemprop="dateCreated datePublished" datetime="2017-11-15T18:07:09+08:00">2017-11-15</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-27 12:24:43" itemprop="dateModified" datetime="2018-04-27T12:24:43+08:00">2018-04-27</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="更新"><a href="#更新" class="headerlink" title="更新"></a>更新</h1><p><strong>April.20 Update:</strong><br>可参考或是直接试用caicloud的开源实现 <a href="https://github.com/caicloud/loadbalancer-controller" target="_blank" rel="noopener">loadbalancer-controller</a></p>
+<p><strong>April.4 Update:</strong></p>
+<p>尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，之后我们可以看到kube-proxy在nat表添加了对应的iptables规则</p>
+<p>查看规则</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">sudo iptables -t nat -L KUBE-SERVICES -n</span><br></pre></td></tr></table></figure>
+<p>以上步骤与传统的IPVS DR配置模式不同的是并未在ingress-nginx-controller的节点上手动绑定VIP到loopback口，再关闭arp响应操作。</p>
+<p>但是实际在lvs节点抓包显示的情况是这样子的：</p>
+<ul>
+<li>clientIP req -&gt; VIP</li>
+<li>VIP经过NAT将请求从10.244.1.0(cni0)这个口走flannel.1路由到10.244.4.10这个节点的pod</li>
+<li>正常来说10.244.4.10应该是直接经过NAT再返回给client，但是实际上是10.244.4.10返回给10.244.1.0再NAT到VIP，最后返回给了client</li>
+</ul>
+<p>这个难道不就是NAT模式吗…</p>
+<hr>
+<h2 id="开始"><a href="#开始" class="headerlink" title="开始"></a>开始</h2><p>首先需要有一个<code>ingress</code>的服务，因为之前<code>ingress</code>的类型为<code>Deployment</code> ,将泛域名解析到单独一台node节点的话会有单点的问题，需要一点变更</p>
+<h3 id="deployment"><a href="#deployment" class="headerlink" title="deployment"></a>deployment</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">DaemonSet</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">nginx-ingress-controller</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span> </span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  selector:</span></span><br><span class="line"><span class="attr">    matchLabels:</span></span><br><span class="line"><span class="attr">      app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">      annotations:</span></span><br><span class="line">        <span class="string">prometheus.io/port:</span> <span class="string">'10254'</span></span><br><span class="line">        <span class="string">prometheus.io/scrape:</span> <span class="string">'true'</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      serviceAccountName:</span> <span class="string">nginx-ingress-serviceaccount</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">nginx-ingress-controller</span></span><br><span class="line"><span class="attr">          image:</span> <span class="string">quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.9.0</span></span><br><span class="line"><span class="attr">          args:</span></span><br><span class="line"><span class="bullet">            -</span> <span class="string">/nginx-ingress-controller</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--default-backend-service=$(POD_NAMESPACE)/default-http-backend</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--configmap=$(POD_NAMESPACE)/nginx-configuration</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--tcp-services-configmap=$(POD_NAMESPACE)/tcp-services</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--udp-services-configmap=$(POD_NAMESPACE)/udp-services</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--annotations-prefix=nginx.ingress.kubernetes.io</span></span><br><span class="line"><span class="attr">          env:</span></span><br><span class="line"><span class="attr">            - name:</span> <span class="string">POD_NAME</span></span><br><span class="line"><span class="attr">              valueFrom:</span></span><br><span class="line"><span class="attr">                fieldRef:</span></span><br><span class="line"><span class="attr">                  fieldPath:</span> <span class="string">metadata.name</span></span><br><span class="line"><span class="attr">            - name:</span> <span class="string">POD_NAMESPACE</span></span><br><span class="line"><span class="attr">              valueFrom:</span></span><br><span class="line"><span class="attr">                fieldRef:</span></span><br><span class="line"><span class="attr">                  fieldPath:</span> <span class="string">metadata.namespace</span></span><br><span class="line"><span class="attr">          ports:</span></span><br><span class="line"><span class="attr">          - name:</span> <span class="string">http</span></span><br><span class="line"><span class="attr">            containerPort:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">          - name:</span> <span class="string">https</span></span><br><span class="line"><span class="attr">            containerPort:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">          livenessProbe:</span></span><br><span class="line"><span class="attr">            failureThreshold:</span> <span class="number">3</span></span><br><span class="line"><span class="attr">            httpGet:</span></span><br><span class="line"><span class="attr">              path:</span> <span class="string">/healthz</span></span><br><span class="line"><span class="attr">              port:</span> <span class="number">10254</span></span><br><span class="line"><span class="attr">              scheme:</span> <span class="string">HTTP</span></span><br><span class="line"><span class="attr">            initialDelaySeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            periodSeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            successThreshold:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">            timeoutSeconds:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">          readinessProbe:</span></span><br><span class="line"><span class="attr">            failureThreshold:</span> <span class="number">3</span></span><br><span class="line"><span class="attr">            httpGet:</span></span><br><span class="line"><span class="attr">              path:</span> <span class="string">/healthz</span></span><br><span class="line"><span class="attr">              port:</span> <span class="number">10254</span></span><br><span class="line"><span class="attr">              scheme:</span> <span class="string">HTTP</span></span><br><span class="line"><span class="attr">            periodSeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            successThreshold:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">            timeoutSeconds:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br><span class="line"></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Service</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  labels:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  ports:</span></span><br><span class="line"><span class="attr">  - name:</span> <span class="string">http</span></span><br><span class="line"><span class="attr">    port:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">    targetPort:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">    protocol:</span> <span class="string">TCP</span></span><br><span class="line"><span class="attr">  - name:</span> <span class="string">https</span></span><br><span class="line"><span class="attr">    port:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">    targetPort:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">    protocol:</span> <span class="string">TCP</span></span><br><span class="line"><span class="attr">  selector:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">ingress-nginx</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>Kind 换成 <code>DaemonSet</code></li>
+<li>去除<code>hostNetwork: true</code></li>
+<li>添加<code>Service</code></li>
+</ul>
+<h3 id="rbac"><a href="#rbac" class="headerlink" title="rbac"></a>rbac</h3><p>基于rbac的认证类型，需要添加<code>sa/clusterrole/clusterrolebinding</code></p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterRole</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line"><span class="attr">- apiGroups:</span> <span class="string">[""]</span></span><br><span class="line"><span class="attr">  resources:</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">pods</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">nodes</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">endpoints</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">services</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">configmaps</span></span><br><span class="line"><span class="attr">  verbs:</span> <span class="string">["get",</span> <span class="string">"list"</span><span class="string">,</span> <span class="string">"watch"</span><span class="string">]</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ServiceAccount</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterRoleBinding</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">roleRef:</span></span><br><span class="line"><span class="attr">  apiGroup:</span> <span class="string">rbac.authorization.k8s.io</span></span><br><span class="line"><span class="attr">  kind:</span> <span class="string">ClusterRole</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">subjects:</span></span><br><span class="line"><span class="attr">- kind:</span> <span class="string">ServiceAccount</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br></pre></td></tr></table></figure>
+<h3 id="configmap"><a href="#configmap" class="headerlink" title="configmap"></a>configmap</h3><p>新建configmap，供kube-keepalived-vip实例在集群中读取配置生成keepalived的配置</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ConfigMap</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">keepalived-vip-configmap</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">data:</span></span><br><span class="line">  <span class="number">172.20</span><span class="number">.10</span><span class="number">.94</span><span class="string">:</span> <span class="string">ingress-nginx/ingress-nginx</span></span><br></pre></td></tr></table></figure>
+<p>data的格式为<code>externalVIP: namespace/svc(:DR|NAT)</code>，括号内为<code>lvs_method</code>，不指定默认为<code>NAT</code>，指明<code>DR</code>的话客户端请求回不来。</p>
+<blockquote>
+<p>DR的话需要在RS的节点的lo网卡绑定vip，配置arp的参数，添加到vip的路由。</p>
+</blockquote>
+<h3 id="keepalived-controller"><a href="#keepalived-controller" class="headerlink" title="keepalived controller"></a>keepalived controller</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">DaemonSet</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      hostNetwork:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">      serviceAccount:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">        image:</span> <span class="string">gcr.io/google-containers/kube-keepalived-vip:0.11</span></span><br><span class="line"><span class="attr">        imagePullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"><span class="attr">        securityContext:</span></span><br><span class="line"><span class="attr">          privileged:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">        volumeMounts:</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/lib/modules</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">modules</span></span><br><span class="line"><span class="attr">          readOnly:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/dev</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">        env:</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">POD_NAME</span></span><br><span class="line"><span class="attr">          valueFrom:</span></span><br><span class="line"><span class="attr">            fieldRef:</span></span><br><span class="line"><span class="attr">              fieldPath:</span> <span class="string">metadata.name</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">POD_NAMESPACE</span></span><br><span class="line"><span class="attr">          valueFrom:</span></span><br><span class="line"><span class="attr">            fieldRef:</span></span><br><span class="line"><span class="attr">              fieldPath:</span> <span class="string">metadata.namespace</span></span><br><span class="line"><span class="attr">        args:</span></span><br><span class="line"><span class="bullet">        -</span> <span class="bullet">--services-configmap=ingress-nginx/keepalived-vip-configmap</span></span><br><span class="line"><span class="bullet">        -</span> <span class="bullet">-v=9</span></span><br><span class="line"><span class="attr">      volumes:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">modules</span></span><br><span class="line"><span class="attr">        hostPath:</span></span><br><span class="line"><span class="attr">         path:</span> <span class="string">/lib/modules</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">        hostPath:</span></span><br><span class="line"><span class="attr">         path:</span> <span class="string">/dev</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br></pre></td></tr></table></figure>
+<p>注意以下没配置正确的话启动会报错</p>
+<ul>
+<li><code>spec.template.spec</code>有<code>serviceAccount: kube-keepalived-vip</code>的配置，不然该实例不能监听到K8S集群内的事件</li>
+<li><code>spec.template.spec.containers[].args</code>需指定上面新建的<code>configmap</code></li>
+</ul>
+<p>检查测试的话，可以查看<code>kube-keepalived-vip-*</code>的pod的log或者是生成的keepalived.conf<br>watch pod状态的话一直Error的话，一般都是有error导致退出，查看log就能找到原因了。</p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/k8s/" rel="tag"># k8s</a>
+          
+            <a href="/tags/ipvs/" rel="tag"># ipvs</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/11/13/两种分配Pods的方式/" rel="next" title="两种分配Pods的方式">
+                <i class="fa fa-chevron-left"></i> 两种分配Pods的方式
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/11/15/K8s的Volume/" rel="prev" title="K8s的Volume">
+                K8s的Volume <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">fengxsong</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">21</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-categories">
+                  <a href="/categories/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">3</span>
+                    <span class="site-state-item-name">categories</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  <a href="/tags/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">13</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  <a href="https://github.com/fengxsong" target="_blank" title="GitHub"><i class="fa fa-fw fa-github"></i></a>
+                  
+                </span>
+              
+                <span class="links-of-author-item">
+                  <a href="https://twitter.com/fengxsong" target="_blank" title="Twitter"><i class="fa fa-fw fa-twitter"></i></a>
+                  
+                </span>
+              
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#更新"><span class="nav-text">更新</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#开始"><span class="nav-text">开始</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#deployment"><span class="nav-text">deployment</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#rbac"><span class="nav-text">rbac</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#configmap"><span class="nav-text">configmap</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#keepalived-controller"><span class="nav-text">keepalived controller</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">fengxsong</span>
+
+  
+
+  
+</div>
+
+
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> v3.7.1</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/theme-next/hexo-theme-next">NexT.Gemini</a> v6.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=6.2.0"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=6.2.0"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=6.2.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=6.2.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=6.2.0"></script>
+
+
+
+  
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

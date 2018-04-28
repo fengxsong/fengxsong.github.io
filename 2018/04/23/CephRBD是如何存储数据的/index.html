@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="en-US">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=6.2.0" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=6.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=6.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=6.2.0" color="#222">
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '6.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="列出pools~$: sudo ceph osd lspoolss0 rbd,1 kube 查找池使用的replication level~$: sudo ceph osd dump | grep -i kubepool 1 &apos;kube&apos; replicated size 2 min_size 1 crush_ruleset 0 object_hash rjenkins pg_num 384 pgp">
+<meta name="keywords" content="ceph,rbd">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CephRBD是如何存储数据的">
+<meta property="og:url" content="https://fengxsong.github.io/2018/04/23/CephRBD是如何存储数据的/index.html">
+<meta property="og:site_name" content="Dummy.">
+<meta property="og:description" content="列出pools~$: sudo ceph osd lspoolss0 rbd,1 kube 查找池使用的replication level~$: sudo ceph osd dump | grep -i kubepool 1 &apos;kube&apos; replicated size 2 min_size 1 crush_ruleset 0 object_hash rjenkins pg_num 384 pgp">
+<meta property="og:locale" content="en-US">
+<meta property="og:updated_time" content="2018-04-27T10:32:21.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CephRBD是如何存储数据的">
+<meta name="twitter:description" content="列出pools~$: sudo ceph osd lspoolss0 rbd,1 kube 查找池使用的replication level~$: sudo ceph osd dump | grep -i kubepool 1 &apos;kube&apos; replicated size 2 min_size 1 crush_ruleset 0 object_hash rjenkins pg_num 384 pgp">
+
+
+
+
+
+
+  <link rel="canonical" href="https://fengxsong.github.io/2018/04/23/CephRBD是如何存储数据的/"/>
+
+
+
+<script type="text/javascript" id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>CephRBD是如何存储数据的 | Dummy.</title>
+  
+
+
+
+
+
+
+
+
+
+  <noscript>
+  <style type="text/css">
+    .use-motion .motion-element,
+    .use-motion .brand,
+    .use-motion .menu-item,
+    .sidebar-inner,
+    .use-motion .post-block,
+    .use-motion .pagination,
+    .use-motion .comments,
+    .use-motion .post-header,
+    .use-motion .post-body,
+    .use-motion .collection-title { opacity: initial; }
+
+    .use-motion .logo,
+    .use-motion .site-title,
+    .use-motion .site-subtitle {
+      opacity: initial;
+      top: initial;
+    }
+
+    .use-motion {
+      .logo-line-before i { left: initial; }
+      .logo-line-after i { right: initial; }
+    }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="en-US">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Dummy.</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">Pretend to be a gopher.</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+    <a href="/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-home"></i> <br />Home</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-about">
+    <a href="/about/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-user"></i> <br />About</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+    <a href="/tags/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />Tags</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-categories">
+    <a href="/categories/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-th"></i> <br />Categories</a>
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+    <a href="/archives/" rel="section">
+      <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />Archives</a>
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/04/23/CephRBD是如何存储数据的/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">CephRBD是如何存储数据的
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-04-23 18:04:36" itemprop="dateCreated datePublished" datetime="2018-04-23T18:04:36+08:00">2018-04-23</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-27 18:32:21" itemprop="dateModified" datetime="2018-04-27T18:32:21+08:00">2018-04-27</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/ceph/" itemprop="url" rel="index"><span itemprop="name">ceph</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="列出pools"><a href="#列出pools" class="headerlink" title="列出pools"></a>列出pools</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo ceph osd lspools</span><br><span class="line">s0 rbd,1 kube</span><br></pre></td></tr></table></figure>
+<h2 id="查找池使用的replication-level"><a href="#查找池使用的replication-level" class="headerlink" title="查找池使用的replication level"></a>查找池使用的<code>replication level</code></h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo ceph osd dump | grep -i kube</span><br><span class="line">pool 1 <span class="string">'kube'</span> replicated size 2 min_size 1 crush_ruleset 0 object_hash rjenkins pg_num 384 pgp_num 384 last_change 38 flags hashpspool stripe_width 0</span><br></pre></td></tr></table></figure>
+<p>可以看到当前replicas的size大小为2，当然我们可以重新配置这个值</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: ceph osd pool <span class="built_in">set</span> kube size 3</span><br></pre></td></tr></table></figure>
+<h2 id="查看kube-pool包含的objects"><a href="#查看kube-pool包含的objects" class="headerlink" title="查看kube pool包含的objects"></a>查看<code>kube pool</code>包含的objects</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo rados -p kube ls</span><br></pre></td></tr></table></figure>
+<h2 id="PG-Placement-Group"><a href="#PG-Placement-Group" class="headerlink" title="PG (Placement Group)"></a>PG (Placement Group)</h2><p>Ceph集群将object对象与PG映射，PG包含了分布在不同osd节点的objects，来提高可用性。</p>
+<h2 id="Object"><a href="#Object" class="headerlink" title="Object"></a>Object</h2><p>在ceph集群里数据存储的最小单位，任意一个东西都是以object的形式保存。</p>
+<h2 id="查看object是关联到哪个PG以及是存储在哪里"><a href="#查看object是关联到哪个PG以及是存储在哪里" class="headerlink" title="查看object是关联到哪个PG以及是存储在哪里"></a>查看<code>object</code>是关联到哪个<code>PG</code>以及是存储在哪里</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo ceph osd map kube rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319</span><br><span class="line">osdmap e12056 pool <span class="string">'kube'</span> (1) object <span class="string">'rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319'</span> -&gt; pg 1.493b5d72 (1.172) -&gt; up ([3,6], p3) acting ([3,6], p3)</span><br></pre></td></tr></table></figure>
+<p>以上提供的信息有<br><code>object</code>的<code>version id</code>为<code>e12056</code>，属于<code>kube</code>pool，<code>kube pool</code>的id为<code>1</code>，<code>object</code>的<code>id</code>为<code>rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319</code>，pg属于<code>1.172</code>，在<code>osd.3</code>以及<code>osd.6</code>上。</p>
+<p>接下来可以去具体的osd节点上查看，可以先从<code>sudo ceph osd tree</code>查看osd节点对应的机器名。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo du -sh /u01/current/1.172_head/</span><br><span class="line">163M /u01/current/1.172_head/</span><br></pre></td></tr></table></figure>
+<p>综上我们可以总结出：</p>
+<ul>
+<li>ceph存储集群可以有不止一个池</li>
+<li>每个池应该有多个pg</li>
+<li>一个pg包含多个object</li>
+<li>一个pg会分布到不同的osd节点，且object也是分布到不同的osd节点，映射到pg的第一个osd节点将是主osd，其他为备节点</li>
+<li>一个object可以被映射到一个pg</li>
+</ul>
+<p>一个池需要多少个pg由公式计算出</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">           (OSDs * 100)</span><br><span class="line">Total PGs = ------------</span><br><span class="line">              Replicas</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">~$: sudo ceph osd <span class="built_in">stat</span></span><br><span class="line">osdmap e12056: 5 osds: 5 up, 5 <span class="keyword">in</span></span><br><span class="line">flags sortbitwise,require_jewel_osds</span><br></pre></td></tr></table></figure>
+<p>公式计算 5*100/2 = 250，再以2的幂等数对比，当replicas size=2，osd size=5的时候，整个集群中共需要有 256 个pg</p>
+<p><a href="https://ceph.com/geen-categorie/how-data-is-stored-in-ceph-cluster/" target="_blank" rel="noopener">how-data-is-stored-in-ceph-cluster</a></p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/ceph/" rel="tag"># ceph</a>
+          
+            <a href="/tags/rbd/" rel="tag"># rbd</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/04/10/K8s集群升级/" rel="next" title="K8s集群升级">
+                <i class="fa fa-chevron-left"></i> K8s集群升级
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/04/26/持续更新笔记/" rel="prev" title="持续更新笔记">
+                持续更新笔记 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">fengxsong</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">21</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-categories">
+                  <a href="/categories/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">3</span>
+                    <span class="site-state-item-name">categories</span>
+                  </a>
+                </div>
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  <a href="/tags/index.html">
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">13</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  <a href="https://github.com/fengxsong" target="_blank" title="GitHub"><i class="fa fa-fw fa-github"></i></a>
+                  
+                </span>
+              
+                <span class="links-of-author-item">
+                  <a href="https://twitter.com/fengxsong" target="_blank" title="Twitter"><i class="fa fa-fw fa-twitter"></i></a>
+                  
+                </span>
+              
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#列出pools"><span class="nav-text">列出pools</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#查找池使用的replication-level"><span class="nav-text">查找池使用的replication level</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#查看kube-pool包含的objects"><span class="nav-text">查看kube pool包含的objects</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PG-Placement-Group"><span class="nav-text">PG (Placement Group)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Object"><span class="nav-text">Object</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#查看object是关联到哪个PG以及是存储在哪里"><span class="nav-text">查看object是关联到哪个PG以及是存储在哪里</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2018</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">fengxsong</span>
+
+  
+
+  
+</div>
+
+
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> v3.7.1</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/theme-next/hexo-theme-next">NexT.Gemini</a> v6.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=6.2.0"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=6.2.0"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=6.2.0"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=6.2.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=6.2.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=6.2.0"></script>
+
+
+
+  
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

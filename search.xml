@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title><![CDATA[如何基于CRD开发一个Controller]]></title>
+    <url>%2F2018%2F04%2F27%2F%E5%A6%82%E4%BD%95%E5%9F%BA%E4%BA%8ECRD%E5%BC%80%E5%8F%91%E4%B8%80%E4%B8%AAController%2F</url>
+    <content type="text"><![CDATA[Let’s get started 以下例子基于helm-crd仅做了部分修改。 创建CRD先定义types.go，路径为pkg/apis/helm.bitnami.com/v1/，注意不要少了注解 (: // +genclient// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Objecttype HelmRelease struct &#123; metav1.TypeMeta `json:",inline"` metav1.ObjectMeta `json:"metadata,omitempty"` Spec HelmReleaseSpec `json:"spec"` Status HelmReleaseStatus `json:"status"`&#125;type HelmReleaseSpec struct &#123; RepoURL string `json:"repoUrl,omitempty"` ChartName string `json:"chartName,omitempty"` Version string `json:"version,omitempty"` Values string `json:"values,omitempty"` Force bool `json:"force,omitempty"` Recreate bool `json:"recreate,omitempty"` Paused bool `json:"paused,omitempty"` Description string `json:"description,omitempty"`&#125;type HelmRealeasePhase stringconst ( HelmRealeasePhaseUnknown HelmRealeasePhase = "" HelmRealeasePhaseNew HelmRealeasePhase = "New" HelmRealeasePhaseReady HelmRealeasePhase = "Ready" HelmRealeasePhaseFailed HelmRealeasePhase = "Failed")type HelmReleaseStatus struct &#123; Config string `json:"config,omitempty"` Phase HelmRealeasePhase `json:"phase"` Revision int32 `json:"revision,omitempty"`&#125;// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Objecttype HelmReleaseList struct &#123; metav1.TypeMeta `json:",inline"` metav1.ListMeta `json:"metadata"` Items []HelmRelease `json:"items"`&#125; 之后使用code-generator生成client/apis的代码 vendor/k8s.io/code-generator/generate-groups.sh \ all \ github.com/fengxsong/helm-crd/pkg/client \ github.com/fengxsong/helm-crd/pkg/apis \ helm.bitnami.com:v1 那么接下来我们只需要专注于controller的实现即可。 Controller实现创建controllercontroller的定义 type Controller struct &#123; // "k8s.io/client-go/kubernetes" 连接apiserver操作k8s内的objects kubeClientset kubernetes.Interface // "github.com/fengxsong/helm-crd/pkg/client/clientset/versioned" code-generator生成，主要调用HelmReleaseInterface clientset helmClientset.Interface // "k8s.io/helm/pkg/helm" 调用集群内的helm tiller server helmClient *helm.Client // "k8s.io/client-go/tools/cache" informer去ListWatch helmreleases的 add/update/delete 事件 informer cache.SharedIndexInformer // "k8s.io/client-go/util/workqueue" 限流 queue workqueue.RateLimitingInterface&#125; NewController函数c := &amp;Controller&#123; kubeClientset: kubeClientset, clientset: clientset, helmClient: helm.NewClient(helm.Host(settings.TillerHost), helm.ConnectTimeout(5)), informer: crdInformersFactory.Helm().V1().HelmReleases().Informer(), queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), ""),&#125; informer注册事件回调 // 回调函数都将key添加到c.queue中c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs&#123; // onAddFunc检查当.status.phase为Ready时直接return AddFunc: c.onAddFunc, // onUpdateFunc检查新旧objects的resourceVersion是否相等，当相等时直接return UpdateFunc: c.onUpdateFunc, // DeleteFunc: c.onDeleteFunc,&#125;) Run即实际运行controller的函数 goroutine处理crash goroutine处理sigterm事件 创建helm客户端所需要初始的配置目录 等待更新informer本地的indexer缓存，之后将事件distribute给所有的listerner Until loops运行runWorker函数，当stop channel关闭时退出 runWorker for look 调用processNextItem processNextItem从c.queue中Pop消费事件，交由updateRelease处理或失败后重试或忽略 updateRelease 从informer indexer里取出key，假定它的状态为不存在，那这个理解为是Delete事件即helmrelease被删除了，调用helmClient.DeleteRelease 添加Paused，可以是操作helmrelease需要审核的情况，当为true时则暂时不采取操作 从.spec.RepoUrl + .spec.Chart + .spec.Version下载chart压缩包到cache文件夹内 helmClient检查以当前helmrelease.Name的名字的Release，当不存在则调用 helmClient.InstallReleaseFromChart，当存在则调用 helmClient.UpdateReleaseFromChart install/update完成后查询对应的Release的信息，更新.status的值，之后又触发Update事件，所以我们需要在onUpdateFunc函数里判断防止重复更新据说1.10的subResources添加了status，但是貌似测试无效即仍会出发Update，还是说姿势有问题？ 以上的操作实际上是类似于手动执行helm cli，所有object的操作信息会在tiller服务端被处理，编排操作交给tiller服务端。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>crd</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[持续更新笔记]]></title>
+    <url>%2F2018%2F04%2F26%2F%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0%E7%AC%94%E8%AE%B0%2F</url>
+    <content type="text"><![CDATA[k8s限制带宽 kubernetes.io/ingress-bandwidth prometheus query查询出来的结果假如是null的话，grafana在图表显示会是no point，我们需要把null的结果默认显示为0，treat null as zero似乎不管用 QUERY **OR vector(0)** ETCD查询所有key值 ETCDCTL_API=3 etcdctl get "" --prefix=trueETCDCTL_API=3 etcdctl get "" --from-key k8s的pod设置hostNetwork: true的时候默认dnsPolicy还是ClusterFirst ，导致这个pod不能解析内部的service，那么需要把dnsPolicy设置为ClusterFirstWithHostNet k8s使用kubeadm起来的时候集群默认是不会schedule pods去master节点的，假如我们需要schedule pods on the master kubectl taint nodes --all node-role.kubernetes.io/master-#ORkubectl taint nodes k8s-master02 node-role.kubernetes.io/master- 假设需要再次设置不允许pod运行在master上 kubectl taint nodes k8s-master02 key=node-role.kubernetes.io/master:NoSchedule taint-and-toleration]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[CephRBD是如何存储数据的]]></title>
+    <url>%2F2018%2F04%2F23%2FCephRBD%E6%98%AF%E5%A6%82%E4%BD%95%E5%AD%98%E5%82%A8%E6%95%B0%E6%8D%AE%E7%9A%84%2F</url>
+    <content type="text"><![CDATA[列出pools~$: sudo ceph osd lspoolss0 rbd,1 kube 查找池使用的replication level~$: sudo ceph osd dump | grep -i kubepool 1 'kube' replicated size 2 min_size 1 crush_ruleset 0 object_hash rjenkins pg_num 384 pgp_num 384 last_change 38 flags hashpspool stripe_width 0 可以看到当前replicas的size大小为2，当然我们可以重新配置这个值 ~$: ceph osd pool set kube size 3 查看kube pool包含的objects~$: sudo rados -p kube ls PG (Placement Group)Ceph集群将object对象与PG映射，PG包含了分布在不同osd节点的objects，来提高可用性。 Object在ceph集群里数据存储的最小单位，任意一个东西都是以object的形式保存。 查看object是关联到哪个PG以及是存储在哪里~$: sudo ceph osd map kube rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319osdmap e12056 pool 'kube' (1) object 'rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319' -&gt; pg 1.493b5d72 (1.172) -&gt; up ([3,6], p3) acting ([3,6], p3) 以上提供的信息有object的version id为e12056，属于kubepool，kube pool的id为1，object的id为rbd_id.kubernetes-dynamic-pvc-3e7d3f6b-d0cd-11e7-ba9d-0a580af40319，pg属于1.172，在osd.3以及osd.6上。 接下来可以去具体的osd节点上查看，可以先从sudo ceph osd tree查看osd节点对应的机器名。 ~$: sudo du -sh /u01/current/1.172_head/163M /u01/current/1.172_head/ 综上我们可以总结出： ceph存储集群可以有不止一个池 每个池应该有多个pg 一个pg包含多个object 一个pg会分布到不同的osd节点，且object也是分布到不同的osd节点，映射到pg的第一个osd节点将是主osd，其他为备节点 一个object可以被映射到一个pg 一个池需要多少个pg由公式计算出 (OSDs * 100)Total PGs = ------------ Replicas ~$: sudo ceph osd statosdmap e12056: 5 osds: 5 up, 5 inflags sortbitwise,require_jewel_osds 公式计算 5*100/2 = 250，再以2的幂等数对比，当replicas size=2，osd size=5的时候，整个集群中共需要有 256 个pg how-data-is-stored-in-ceph-cluster]]></content>
+      <categories>
+        <category>ceph</category>
+      </categories>
+      <tags>
+        <tag>ceph</tag>
+        <tag>rbd</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[K8s集群升级]]></title>
+    <url>%2F2018%2F04%2F10%2FK8s%E9%9B%86%E7%BE%A4%E5%8D%87%E7%BA%A7%2F</url>
+    <content type="text"><![CDATA[准备工作手动安装kubeadm新版本 export VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt) export ARCH=amd64 # or: arm, arm64, ppc64le, s390xcurl -sSL https://dl.k8s.io/release/$&#123;VERSION&#125;/bin/linux/$&#123;ARCH&#125;/kubeadm &gt; /tmp/kubeadmchmod a+rx /tmp/kubeadm 执行检查升级版本计划 sudo /tmp/kubeadm upgrade plan preflight check不通过，报错如下 [upgrade/config] FATAL: could not decode configuration: unable to decode config from bytes: v1alpha1.MasterConfiguration: KubeProxy: v1alpha1.KubeProxy: Config: v1alpha1.KubeProxyConfiguration: FeatureGates: ReadMapCB: expect &#123; or n, but found ", error found in #10 byte of ...|reGates":"","healthz|..., bigger context ...|24h0m0s"&#125;,"enableProfiling":false,"featureGates":"","healthzBindAddress":"0.0.0.0:10256","hostnameOv|... KubeProxyConfiguration的featureGates由string类型更换成了map类型，那么通过手动修改当前的MasterConfiguration.kubeProxy.config.featureGates为{}即可。 kubectl -n kube-system edit cm kubeadm-config 当前使用kubeadm-ha安装的k8s集群使用了外部的etcd，但是在cmd/kubeadm/app/cmd/upgrade/plan.go的仍然是指定了内部的etcd集群 func RunPlan(parentFlags *cmdUpgradeFlags) error &#123; // Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning. upgradeVars, err := enforceRequirements(parentFlags, false, "") if err != nil &#123; return err &#125; // Define Local Etcd cluster to be able to retrieve information etcdCluster := kubeadmutil.LocalEtcdCluster&#123;&#125; // Compute which upgrade possibilities there are availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdCluster, upgradeVars.cfg.FeatureGates) if err != nil &#123; return fmt.Errorf("[upgrade/versions] FATAL: %v", err) &#125; // Tell the user which upgrades are available printAvailableUpgrades(availUpgrades, os.Stdout, upgradeVars.cfg.FeatureGates) return nil&#125; 最新版本在upgrade时未能手动指定或是读取masterConfiguration的etcd的配置来连接外部的etcd集群，待解决。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>kubeadm</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[K8s日志收集]]></title>
+    <url>%2F2018%2F04%2F01%2FK8s%E6%97%A5%E5%BF%97%E6%94%B6%E9%9B%86%2F</url>
+    <content type="text"><![CDATA[官方文档 因为业务出现exception的话会打印多行错误日志，虽然说我们可以通过multiline的方式，但需要日志是符合指定的格式的。线上各种业务的日志格式不一，所以还是将业务日志写在文件里，以hostPath挂载的方式来处理。 ---apiVersion: v1kind: ConfigMapmetadata: name: filebeat-config namespace: kube-system labels: k8s-app: filebeat kubernetes.io/cluster-service: "true"data: filebeat.yml: |- filebeat.config: prospectors: # Mounted `filebeat-prospectors` configmap: path: $&#123;path.config&#125;/prospectors.d/*.yml # Reload prospectors configs as they change: reload.enabled: true modules: path: $&#123;path.config&#125;/modules.d/*.yml # Reload module configs as they change: reload.enabled: false processors: - add_cloud_metadata: output.redis: hosts: '$&#123;FILEBEAT_OUTPUT&#125;' key: '%&#123;[fields.log_topic]&#125;'---apiVersion: v1kind: ConfigMapmetadata: name: filebeat-prospectors namespace: kube-system labels: k8s-app: filebeat kubernetes.io/cluster-service: "true"data: kubernetes.yml: |- - type: docker containers.ids: - "*" fields: log_topic: filebeat-docker processors: - add_kubernetes_metadata: in_cluster: true - type: log paths: - /logs/*/*.log fields: log_topic: filebeat-log multiline.pattern: '^\[[0-9]&#123;4&#125;-[0-9]&#123;2&#125;-[0-9]&#123;2&#125;' multiline.negate: true multiline.match: after---apiVersion: extensions/v1beta1kind: DaemonSetmetadata: name: filebeat namespace: kube-system labels: k8s-app: filebeat kubernetes.io/cluster-service: "true"spec: template: metadata: labels: k8s-app: filebeat kubernetes.io/cluster-service: "true" spec: serviceAccountName: filebeat terminationGracePeriodSeconds: 30 containers: - name: filebeat image: hub.ppmoney.io/common/filebeat:6.2.2 args: [ "-c", "/etc/filebeat.yml", "-e", ] env: - name: FILEBEAT_OUTPUT value: "kafka.ppmoney.io:9092" securityContext: runAsUser: 0 resources: limits: memory: 200Mi requests: cpu: 100m memory: 100Mi volumeMounts: - name: config mountPath: /etc/filebeat.yml readOnly: true subPath: filebeat.yml - name: prospectors mountPath: /usr/share/filebeat/prospectors.d readOnly: true - name: data mountPath: /usr/share/filebeat/data - name: varlibdockercontainers mountPath: /var/lib/docker/containers readOnly: true - name: datalogs mountPath: /logs readOnly: true volumes: - name: config configMap: defaultMode: 0600 name: filebeat-config - name: varlibdockercontainers hostPath: path: /data/docker/containers - name: datalogs hostPath: path: /data/logs - name: prospectors configMap: defaultMode: 0600 name: filebeat-prospectors - name: data hostPath: path: /data/filebeat---apiVersion: rbac.authorization.k8s.io/v1beta1kind: ClusterRoleBindingmetadata: name: filebeatsubjects:- kind: ServiceAccount name: filebeat namespace: kube-systemroleRef: kind: ClusterRole name: filebeat apiGroup: rbac.authorization.k8s.io---apiVersion: rbac.authorization.k8s.io/v1beta1kind: ClusterRolemetadata: name: filebeat labels: k8s-app: filebeatrules:- apiGroups: [""] # "" indicates the core API group resources: - namespaces - pods verbs: - get - watch - list---apiVersion: v1kind: ServiceAccountmetadata: name: filebeat namespace: kube-system labels: k8s-app: filebeat--- 应用接入配置日志写入到/data/logcenter/目录（使用helm） logfile: persistent: true src: /data/logs dest: /data/logcenter app-deployment部分的修改 spec: template: spec: containers: - volumeMounts: &#123;&#123;- if .Values.image.logfile.persistent &#125;&#125; - name: logfile mountPath: &#123;&#123; .Values.image.logfile.dest &#125;&#125; &#123;&#123;- end &#125;&#125; volumes: &#123;&#123;- if .Values.image.logfile.persistent &#125;&#125; - name: logfile hostPath: path: &#123;&#123; .Values.image.logfile.src &#125;&#125; &#123;&#123;- end &#125;&#125; logstash indexer端以不同的log_topic从消息队列取出处理。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>logging</tag>
+        <tag>elk</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[挂载pvc的deploy如何rollingupdate]]></title>
+    <url>%2F2018%2F03%2F31%2F%E6%8C%82%E8%BD%BDpvc%E7%9A%84deploy%E5%A6%82%E4%BD%95rollingupdate%2F</url>
+    <content type="text"><![CDATA[假如我们的服务需要保持有状态，通常情况下我们会给pod挂载一个pvc，保证pod-xx被杀掉之后pod-xy起来后仍能访问之前写入文件路径的内容。在使用rollingUpdate的时候，默认的spec.strategy为 strategy: rollingUpdate: maxSurge: 1 maxUnavailable: 1 type: RollingUpdate 这样表示在rolling update过程中，这里假设replicas=1，它需要最少一个pod是status: ready的状态，这个pod通常是旧的deployment产生的pod；同时需要去生成一个新的pod，当新的pod调度到不同的node节点，因为旧的pod仍挂在着pvc，而这类pvc不支持readWriteMany，所以会导致新的pod挂载不上原先的disk，kubectl describe pod显示报错类似Volume is already exclusively attached to one node and can&#39;t be attached to another 解决方法： .spec.strategy.type==Recreate这个方法比较简单粗暴，在新的pods起来之前会杀掉所有旧的pods 设置maxUnavailable=0 deployment/#strategy]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[使用代理机器缓存gcr的镜像]]></title>
+    <url>%2F2018%2F03%2F05%2F%E4%BD%BF%E7%94%A8%E4%BB%A3%E7%90%86%E6%9C%BA%E5%99%A8%E7%BC%93%E5%AD%98gcr%E7%9A%84%E9%95%9C%E5%83%8F%2F</url>
+    <content type="text"><![CDATA[因为伟大的gfw的问题，每次下载镜像都需要在有开启了HTTP(S)_PROXY的docker主机上pull下来，save之后复制到目标机器再load到node节点本地。那么我们现在可以通过registry的proxy和dns欺骗的方式来实现只需要一台机器来代理并缓存gcr.io的镜像的功能。 在代理机器的docker配置HTTP(S)_PROXY，保证可以拉取到外网的镜像（这一步应该不是必须的） 运行registry的服务 docker run -d -p 80:5000 --restart=always -e HTTPS_PROXY=$proxy_addr:$port --name registry -v /data/registry:/var/lib/registry -v pwd/config.yml:/etc/docker/registry/config.yml registry:2 $proxy_addr:$port可以是同个内网网络中的ss客户端启用了允许来自局域网的连接功能，那么这个proxy_addr就是http://$proxy_addr:$port的格式，走http代理，当然也可以是socks5的代理。 config.yml的配置内容仅是在默认的配置上添加了proxy段 version: 0.1log: fields: service: registrystorage: cache: blobdescriptor: inmemory filesystem: rootdirectory: /var/lib/registryhttp: addr: :5000 headers: X-Content-Type-Options: [nosniff]health: storagedriver: enabled: true interval: 10s threshold: 3proxy: remoteurl: https://gcr.io 然后把客户机的hosts文件中添加记录，将gcr.io指向到代理机的IP地址 最后一步添加配置到docker的配置文件daemon.json &#123; "registry-mirrors": ["http://gcr.io"], "insecure-registries": ["http://gcr.io"]&#125; 因为代理机上面的registry没有使用tls，所以需要添加insecure的选项。接下来你就可以很愉快地pull外网镜像。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>gfw</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[K8s针对资源紧缺处理]]></title>
+    <url>%2F2018%2F02%2F23%2FK8s%E9%92%88%E5%AF%B9%E8%B5%84%E6%BA%90%E7%B4%A7%E7%BC%BA%E5%A4%84%E7%90%86%2F</url>
+    <content type="text"><![CDATA[当前部分node节点可用内存经常低至2Gi，导致prometheus频繁报警。 调整了告警的规则 - alert: NodeMemRunningOut expr: node_memory_MemAvailable/1024/1024/1024 &lt;= 2 for: 10m labels: severity: critical annotations: description: "节点 &#123;&#123;$labels.instance&#125;&#125; 可用内存将耗尽, 剩余比例 &#123;&#123; $value &#125;&#125;" 再设置kubelet的启动项，添加如下 --eviction-hard=memory.available&lt;1.5Gi,nodefs.available&lt;10%,nodefs.inodesFree&lt;5% --system-reserved=memory=3Gi 当可用内存小于1.5Gi的时候，强制杀死该node节点上的pod，重新分配到其他节点。 系统服务所需使用最下内存为3Gi。 重启kubelet服务。 其实还是要规划计算好单个container的request/limit的值 https://kubernetes.io/docs/tasks/administer-cluster/out-of-resource/]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>resource</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[Kubelet Volume State Metrics]]></title>
+    <url>%2F2018%2F02%2F09%2FKubelet-Volume-State-Metrics%2F</url>
+    <content type="text"><![CDATA[1.9.x版本存在这个问题promethues监控pvc容量遇到的问题 go/src/k8s.io/kubernetes/pkg/kubelet/metrics/metrics.go | L206 func Register(containerCache kubecontainer.RuntimeCache) go/src/k8s.io/kubernetes/pkg/kubelet/kubelet.go | L591 klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration) | L1317 kl.resourceAnalyzer.Start() go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/resource/_analyzer.go | L40/L47 func NewResourceAnalyzer(statsProvider StatsProvider, calVolumeFrequency time.Duration) ResourceAnalyzer.Start() go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/fs/_resource/_analyzer.go | L60 func (s *fsResourceAnalyzer) Start() | L72 func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() | L88 entry.StopOnce() go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/volume/_stat/_calculator.go | L63 func (s volumeStatCalculator) StartOnce() volumeStatCalculator -&gt; wait.JitterUntil持续调用函数calcAndStoreStats，当stopChannel关闭时停止调用 | L74 func (s volumeStatCalculator) StopOnce() volumeStatCalculator -&gt; 关闭了stopChannel 此时仅停止已经删除的pods对应的volumeStatCalculator即注册到prometheus metrics针对这个POD的PVC的指标不会再更新，但是仍然存在，这样exporter去采集的时候仍然采集到这个metric并入库到prometheus中。 解决方法： 当出现PVC容量告警时手动重启对应节点的kubelet？ feature request：在entry.StopOnce()的同时重新Register关于VolumeStats的metrics，即调用unregister再register，或者是不使用定时计算并缓存的方法而采用当prometheus去exporter采集时更新的方式？ 忽略这种问题，在prometheus的rule中修改expr规则？ –volume-stats-agg-period duration Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.(default 1m0s) https://github.com/kubernetes/kubernetes/issues/57686]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>prometheus</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[Harbor升级遇到的问题]]></title>
+    <url>%2F2018%2F01%2F30%2FHarbor%E5%8D%87%E7%BA%A7%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98%2F</url>
+    <content type="text"><![CDATA[stop and remove the Harbor instancedocker-compose down backup databasedocker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] backup delete (or rename) the original database directoryrm -rf /data/database create a new harbor instance, in order to automatically recreate a new db instancedocker-compose up -d &amp;&amp; docker-compose stop restore database from backup file in /path/to/backupdocker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] restore upgrade db schema and migrate data(optional)docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql vmware/harbor-db-migrator:[tag] up head start the new harbor delete images from harbor registrydelete images via web uirun command in consoledocker-compose stopdocker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect --dry-run /etc/registry/config.yml Note the above option --dry-run will print the progress without removeing any data. let’s actually do the “cleaning” job docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect /etc/registry/config.yml start harbor docker-compose start]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>harbor</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[使用ceph-exporter监控ceph集群]]></title>
+    <url>%2F2018%2F01%2F29%2F%E4%BD%BF%E7%94%A8ceph-exporter%E7%9B%91%E6%8E%A7ceph%E9%9B%86%E7%BE%A4%2F</url>
+    <content type="text"><![CDATA[ceph-exporterdocker version &lt;= 1.13的话不支持build git仓库内的Dockerfile？ 在docker hub下载的镜像太大，所以自己编译打包了一个image go get -u -v github.com/digitalocean/ceph_exportermkdir -p ~/ceph_exporter &amp;&amp; cd ~/ceph_exportercp $GOPATH/bin/ceph_exporter .docker build -t hub.ppmoney.io/common/ceph_exporter:2.0.0 .docker push hub.ppmoney.io/common/ceph_exporter:2.0.0 dockerfileFROM ubuntu:16.04RUN apt-get update \ &amp;&amp; apt-get install -y librados-dev librbd1 \ &amp;&amp; rm -rf /var/lib/apt/lists/*COPY ceph_exporter /bin/ceph_exporterEXPOSE 9128ENTRYPOINT ["/bin/ceph_exporter"] deployment/svcapiVersion: extensions/v1beta1kind: Deploymentmetadata: name: ceph-exporter namespace: monitoringspec: replicas: 1 template: metadata: labels: app: ceph-exporter name: ceph-exporter spec: containers: - name: ceph-exporter image: hub.ppmoney.io/common/ceph_exporter:2.0.0 imagePullPolicy: Always ports: - name: http-metrics containerPort: 9128 protocol: TCP volumeMounts: - mountPath: /etc/localtime name: localtime readOnly: true - mountPath: /etc/ceph name: ceph-cfg readOnly: true hostAliases: - ip: "172.20.10.91" hostnames: - "node01" - ip: "172.20.10.97" hostnames: - "node06" - ip: "172.20.10.98" hostnames: - "node07" volumes: - name: localtime hostPath: path: /etc/localtime - name: ceph-cfg hostPath: path: /etc/ceph---apiVersion: v1kind: Servicemetadata: name: ceph-exporter namespace: monitoring labels: k8s-app: ceph-exporterspec: selector: app: ceph-exporter ports: - name: http-metrics port: 9128 targetPort: 9128 添加hostAliases是因为ceph.conf中mon是用的hostname的方式，不添加到container的host记录的话会解析不到这些节点的IP 重点，利用prometheus-operator的servicemonitorapiVersion: monitoring.coreos.com/v1kind: ServiceMonitormetadata: name: ceph-exporter labels: k8s-app: ceph-exporterspec: jobLabel: k8s-app endpoints: - port: http-metrics interval: 30s selector: matchLabels: k8s-app: ceph-exporter namespaceSelector: matchNames: - monitoring 新建serviceMonitor kubectl create -n monitoring -f ceph_exporter-sm.yaml 过一会我们查看prometheus的日志可以看到自动reload了配置，config中已经有了ceph-exporter这个job，并且可以查询到ceph-exportor检测到的metrics了。 优化项 添加nodeSelector，因为部分节点假如不在ceph-admin节点执行ceph-deploy admin nodename的话，/etc/ceph/目录并不存在，exporter依赖于该目录下的ceph.client.admin.keyring和ceph.conf grafana-dashboard]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[Prometheus Operator]]></title>
+    <url>%2F2018%2F01%2F26%2FPrometheus-Operator%2F</url>
+    <content type="text"><![CDATA[prometheus-operator promethues-operator是一个通过监听K8s内CRD资源的变更操作事件来自动创建，配置并管理prometheus监控系统的一个控制器，可以理解成是一个类似于controller-manager的东西，只不过它的管理对象不是ds/deploy/sts/svc等 官网/github 整套方案包括以下组件 prometheus prometheus是一个开源的监控告警系统，具有由度量名称和键/值对标识的时间序列数据的多维数据模型、灵活的查询语言，监控模式是通过HTTP主动去拉取exporters上基于时间序列的监控采集数据，同时也能通过中间网关来支持推送型的监控数据收集，所有的监控目标都是通过配置型的或是服务发现，或是静态配置，提供了HTTP页面支持图形和仪表盘的展示。 alertmanager alertmanager处理由客户端应用程序发送的prometheus警报，将重复的告警信息通过特定的标签去分组，并将它们路由到正确的接收方，特点是能够grouping、抑制、设置静默等。 一个简单的钉钉机器人 从alertmanager通过webhook的方式发送告警信息，将payload渲染成配置好的模板，并发送到指定的钉钉机器人 grafana 有了prometheus去收集数据，那我们还需要将这些metrics通过web页面展示出来，那grafana就是这样的一个工具，它支持多种数据源，能让你查询、展示或者基于这些告警数据来发送警报（虽然也支持prometheus数据源但是我们并没有使用到），最实用的是它在社区有维护了很多开箱即用的面板模板，只需要少少的修改就能展示出一个很详细的展示面板出来。当然，它也实现了自己的一套DSL语言。 node-exporter 一个golang写的能够采集硬件以及OS信息的收集器，采集目标包括cpu/硬盘/conntrack/文件系统/负载/网络连接信息/硬件信息等，在K8S内使用daemonSet的方式运行，保证每台节点主机都能监控起自身的信息 cadvisor 示例中的prometheus-operator生成的监控目标包含了cadvisor虽然K8S组件kubelet编译包含了cadvisor，但是默认是不启用的。cadvisor也是通过HTTP的方式暴露了节点主机上的资源使用率、性能指标以及运行的容器信息 kube-state-metrics 这个插件通过去APISERVER获取K8S内对象并生成对象对应的监控数据，例如nodes、pods、deployments等，具体可查阅[文档][10] 当然还有各个组件自带的metrics 其实倒数四个都是属于采集器，负责收集对应系统组件的信息。 部署git clone https://github.com/coreos/prometheus-operatorcd prometheus-operator/contrib/kube-prometheus/bash hack/cluster-monitoring/deploy 架构设计prometheus-operator使用了k8s1.8+引入的CRD(custom resource definitions)，实现了controller的功能，通俗点来说，它负责将resource definition转换成K8S里的statefulset或者是promethues的配置对象。 Prometheus Operator会ListWatch集群内的Prometheus CRD来创建一个合适的statefulset在monitoring(.metadata.namespace指定)命名空间，并且挂载了一个名为prometheus-k8s的Secret为Volume到/etc/prometheus/config目录，Secret的data包含了以下内容 configmaps.json指定了rule-files在configmap的名字 prometheus.yaml为主配置文件 ServiceMonitor 这个允许动态地监听K8S里的Service，会将生成的job更新到上面的prometheus-k8s这个Secret的 Data.**prometheus.yaml**里，然后prometheus这个pod里的sidecar容器prometheus-config-reloader当检测到挂载路径的文件发生改变后自动去执行HTTPPost请求到/api/-reload-路径去reload配置 Alertmanager 这个将生成一个statefulset类型对象，并挂载了名为alertmanager-main的secret资源到容器内部的/etc/alertmanager/config/alertmanager.yaml路径。当需要更新配置文件时需要将alertmanager.yaml内容base64encode后更新到alertmanager-main的Data属性或者直接patch secret from file]]></content>
+      <categories>
+        <category>prometheus</category>
+      </categories>
+      <tags>
+        <tag>prometheus</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[Expanding PVC]]></title>
+    <url>%2F2018%2F01%2F18%2FExpanding-PVC%2F</url>
+    <content type="text"><![CDATA[admission-controller开启PersistentVolumeClaimsResize expanding Persistent Volume Claims]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>pvc</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[Pod卡在terminated状态]]></title>
+    <url>%2F2017%2F12%2F25%2FPod%E5%8D%A1%E5%9C%A8terminated%E7%8A%B6%E6%80%81%2F</url>
+    <content type="text"><![CDATA[在部署helm的过程中，因为大中华防火墙的问题导致了一台node节点拉不到容器，之后所有内部仓库的镜像也拉取不到？ delete pod并不能删除pod，那么我们需要强制删除到 kubectl delete pod NAME --grace-period=0 --force 从kubelet跟docker的日志完全看不出问题，之后使用重启大法重启了kubelet就恢复了(这做法太蠢了)]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[StorageClass的ReclaimPolicy]]></title>
+    <url>%2F2017%2F11%2F28%2FStorageClass%E7%9A%84ReclaimPolicy%2F</url>
+    <content type="text"><![CDATA[reclaimPolicy: Retain默认为DELETE，会导致当删除PVC时，由storageclass自动生成的PV也会跟着删除，而这个PV可能已经保存了用户不需要删除的数据。所以设置reclaimPolicy: Retain，但是好像没有生效？ edit manuallykubectl get pvkubectl patch pv &lt;your-pv-name&gt; -p &apos;&#123;&quot;spec&quot;:&#123;&quot;persistentVolumeReclaimPolicy&quot;:&quot;Retain&quot;&#125;&#125;&apos; change default storageclasskubectl patch storageclass rbd -p &apos;&#123;&quot;metadata&quot;: &#123;&quot;annotations&quot;:&#123;&quot;storageclass.kubernetes.io/is-default-class&quot;:&quot;false&quot;&#125;&#125;&#125;&apos; 解决storageclass的reclaimPolicy的问题（现在应该不存在这问题了） 最新的release的代码中provision.go已经适配了k8s-1.8的api接口，支持了PersistentVolumeReclaimPolicy 但是quay.io/external_storage/rbd-provisioner:latest 这个镜像并没有更新推上去… 手动编译打包并推到内部registry，然后修改deployment的image为内部仓库镜像即可 go get -u github.com/kubernetes-incubator/external-storagecd ~/go/src/github.com/kubernetes-incubator/external-storage/ceph/rbdmake push#因为上面make push生产的tag是latest，所以我们需要手动给打上其他标签docker tag quay.io/external_storage/rbd-provisioner:latest hub.ppmoney.io/common/rbd-provisioner:latest ReclaimPolicy策略为Retain时回收Release状态的pv查看到STATUS为Released的PV，直接删除delete pv的方式，provisioner并不会监听这些事件去删除实际在pool中的pv，所以我们需要给这个pv更新下属性 kubectl get pvkubectl patch pv pvc-fce10e1d-c9e8-11e7-aa87-005056b12f99 --patch '&#123;"spec": &#123;"persistentVolumeReclaimPolicy": "Delete"&#125;&#125;' 这样子rbd-provisioner会在监听到pv属性变更事件后调用controller.Provisioner.Delete方法 接下来可以去ceph rbd看到存储已经被删除掉了 sudo rbd ls -p kube]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>pvc</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[Deploy Harbor registry in K8s]]></title>
+    <url>%2F2017%2F11%2F28%2FDeploy-Harbor-registry-in-K8s%2F</url>
+    <content type="text"><![CDATA[without-tls模式下，daemon.json需要配置insecure-registries 不能使用ingress自动配置域名 原因是docker push的时候没有添加Host的请求头，导致将请求转发到默认后端导致了404。 现在是使用ingress-nginx + keepalived的组合，使用了DaemonSet的方式，需要调整成Deployment+nodeSelector或者affinity限定LBS运行在某些node节点，再在其他node节点用hostNetwork的方式来跑harbor的nginx组件。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>harbor</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[K8s的Volume]]></title>
+    <url>%2F2017%2F11%2F15%2FK8s%E7%9A%84Volume%2F</url>
+    <content type="text"><![CDATA[当需要将多个已存在的volume放在同一个目录的时候，使用projected类型 apiVersion: v1kind: Pod...spec: containers: - name: demo volumeMounts: - name: all-in-one mountPath: /projected readOnly: true volumes: - name: all-in-one projected: sources: - secret: name: user - secret: name: pass secret类型创建secret# Create files containing the username and password:echo -n "admin" &gt; ./username.txtecho -n "1f2d1e2e67df" &gt; ./password.txt# Package these files into secrets:kubectl create secret generic user --from-file=./username.txtkubectl create secret generic pass --from-file=./password.txt emptyDir是表示在这个POD的存活周期内不会消失不见。 spec: volumes: - name: sec-ctx-vol emptyDir: &#123;&#125; pod跟configmap(cm)$ kubectl create configmap special-config --from-literal=special.how=very$ kubectl edit pod dapi-test-podapiVersion: v1kind:spec: containers: - name: test-container image: env: - name: TEST_ENV valueFrom: configMapKeyRef: name: special-config key: special.how 将configMap的data作为env变量spec: containers: - name: test-containers envFrom: - configMapRef: name: special-config pod跟secret$ kubectl create secret generic test-secret --from-literal=username='my-app' --from-literal=password='39528$vdg7Jb' pod中将secret以文件方式挂载为volume spec: containers: - name: volumeMounts: - name: secret-volume mountPath: /etc/secret-volume volume: - name: secret-volume secret: secretName: test-secret pod中将secret的值作为环境变量 spec: containers: - name: xxx env: - name: SECRET_USERNAME valueFrom: secretKeyRef: key: username name: test-secret - name: SECRET_PASSWORD valueFrom: secretKeyRef: key: password name: test-secret]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[IngressController与IPVS]]></title>
+    <url>%2F2017%2F11%2F15%2FIngressController%E4%B8%8EIPVS%2F</url>
+    <content type="text"><![CDATA[更新April.20 Update:可参考或是直接试用caicloud的开源实现 loadbalancer-controller April.4 Update: 尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，之后我们可以看到kube-proxy在nat表添加了对应的iptables规则 查看规则 sudo iptables -t nat -L KUBE-SERVICES -n 以上步骤与传统的IPVS DR配置模式不同的是并未在ingress-nginx-controller的节点上手动绑定VIP到loopback口，再关闭arp响应操作。 但是实际在lvs节点抓包显示的情况是这样子的： clientIP req -&gt; VIP VIP经过NAT将请求从10.244.1.0(cni0)这个口走flannel.1路由到10.244.4.10这个节点的pod 正常来说10.244.4.10应该是直接经过NAT再返回给client，但是实际上是10.244.4.10返回给10.244.1.0再NAT到VIP，最后返回给了client 这个难道不就是NAT模式吗… 开始首先需要有一个ingress的服务，因为之前ingress的类型为Deployment ,将泛域名解析到单独一台node节点的话会有单点的问题，需要一点变更 deploymentapiVersion: extensions/v1beta1kind: DaemonSetmetadata: name: nginx-ingress-controller namespace: ingress-nginx spec: selector: matchLabels: app: ingress-nginx template: metadata: labels: app: ingress-nginx annotations: prometheus.io/port: '10254' prometheus.io/scrape: 'true' spec: serviceAccountName: nginx-ingress-serviceaccount containers: - name: nginx-ingress-controller image: quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.9.0 args: - /nginx-ingress-controller - --default-backend-service=$(POD_NAMESPACE)/default-http-backend - --configmap=$(POD_NAMESPACE)/nginx-configuration - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services - --udp-services-configmap=$(POD_NAMESPACE)/udp-services - --annotations-prefix=nginx.ingress.kubernetes.io env: - name: POD_NAME valueFrom: fieldRef: fieldPath: metadata.name - name: POD_NAMESPACE valueFrom: fieldRef: fieldPath: metadata.namespace ports: - name: http containerPort: 80 - name: https containerPort: 443 livenessProbe: failureThreshold: 3 httpGet: path: /healthz port: 10254 scheme: HTTP initialDelaySeconds: 10 periodSeconds: 10 successThreshold: 1 timeoutSeconds: 1 readinessProbe: failureThreshold: 3 httpGet: path: /healthz port: 10254 scheme: HTTP periodSeconds: 10 successThreshold: 1 timeoutSeconds: 1 nodeSelector: ingress-instance: "true"---apiVersion: v1kind: Servicemetadata: name: ingress-nginx namespace: ingress-nginx labels: app: ingress-nginxspec: ports: - name: http port: 80 targetPort: 80 protocol: TCP - name: https port: 443 targetPort: 443 protocol: TCP selector: app: ingress-nginx Kind 换成 DaemonSet 去除hostNetwork: true 添加Service rbac基于rbac的认证类型，需要添加sa/clusterrole/clusterrolebinding apiVersion: rbac.authorization.k8s.io/v1beta1kind: ClusterRolemetadata: name: kube-keepalived-viprules:- apiGroups: [""] resources: - pods - nodes - endpoints - services - configmaps verbs: ["get", "list", "watch"]---apiVersion: v1kind: ServiceAccountmetadata: name: kube-keepalived-vip namespace: ingress-nginx---apiVersion: rbac.authorization.k8s.io/v1beta1kind: ClusterRoleBindingmetadata: name: kube-keepalived-viproleRef: apiGroup: rbac.authorization.k8s.io kind: ClusterRole name: kube-keepalived-vipsubjects:- kind: ServiceAccount name: kube-keepalived-vip namespace: ingress-nginx configmap新建configmap，供kube-keepalived-vip实例在集群中读取配置生成keepalived的配置 apiVersion: v1kind: ConfigMapmetadata: name: keepalived-vip-configmap namespace: ingress-nginxdata: 172.20.10.94: ingress-nginx/ingress-nginx data的格式为externalVIP: namespace/svc(:DR|NAT)，括号内为lvs_method，不指定默认为NAT，指明DR的话客户端请求回不来。 DR的话需要在RS的节点的lo网卡绑定vip，配置arp的参数，添加到vip的路由。 keepalived controllerapiVersion: extensions/v1beta1kind: DaemonSetmetadata: name: kube-keepalived-vip namespace: ingress-nginxspec: template: metadata: labels: name: kube-keepalived-vip spec: hostNetwork: true serviceAccount: kube-keepalived-vip containers: - name: kube-keepalived-vip image: gcr.io/google-containers/kube-keepalived-vip:0.11 imagePullPolicy: IfNotPresent securityContext: privileged: true volumeMounts: - mountPath: /lib/modules name: modules readOnly: true - mountPath: /dev name: dev env: - name: POD_NAME valueFrom: fieldRef: fieldPath: metadata.name - name: POD_NAMESPACE valueFrom: fieldRef: fieldPath: metadata.namespace args: - --services-configmap=ingress-nginx/keepalived-vip-configmap - -v=9 volumes: - name: modules hostPath: path: /lib/modules - name: dev hostPath: path: /dev nodeSelector: ingress-instance: "true" 注意以下没配置正确的话启动会报错 spec.template.spec有serviceAccount: kube-keepalived-vip的配置，不然该实例不能监听到K8S集群内的事件 spec.template.spec.containers[].args需指定上面新建的configmap 检查测试的话，可以查看kube-keepalived-vip-*的pod的log或者是生成的keepalived.confwatch pod状态的话一直Error的话，一般都是有error导致退出，查看log就能找到原因了。]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>ipvs</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[两种分配Pods的方式]]></title>
+    <url>%2F2017%2F11%2F13%2F%E4%B8%A4%E7%A7%8D%E5%88%86%E9%85%8DPods%E7%9A%84%E6%96%B9%E5%BC%8F%2F</url>
+    <content type="text"><![CDATA[使用nodeSelector$ kubectl get nodes --show-labels 没有满足的labels时我们可以另外给node节点打标签 $ kubectl label nodes node02 ingress-instance=true 删除label $ kubectl label nodes node02 ingress-instance- ds/deploy/sts等使用nodeSelector spec: template: spec: containers: ... nodeSelector: ingress-instance: "true" Affinity and anti-affinity requiredDuringSchedulingIgnoredDuringExecution preferredDuringSchedulingIgnoredDuringExecution apiVersion: v1kind: Deployment...spec: affinity: nodeAffinity: requiredDuringSchedulingIgnoredDuringExecution: nodeSelectorTerms: - matchExpressions: - key: ingress-instance operator: In values: "true" preferredDuringSchedulingIgnoredDuringExecution: ... REF]]></content>
+      <categories>
+        <category>k8s</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[K8s使用cephRDB块作为动态存储]]></title>
+    <url>%2F2017%2F10%2F19%2FK8s%E4%BD%BF%E7%94%A8cephRDB%E5%9D%97%E4%BD%9C%E4%B8%BA%E5%8A%A8%E6%80%81%E5%AD%98%E5%82%A8%2F</url>
+    <content type="text"><![CDATA[准备工作Install ceph-common packagesudo apt-get ceph-common Create Pool for dynamic volumes$ ceph osd pool create kube 1024$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=kube' -o ceph.client.kube.keyring mon=allow rread mon to find osdosd=allow class-read object_prefix rbd_children, allow rwx pool=kuberead rbd_children prefix, full access to kube pool) Creating ceph secretapiVersion: v1kind: Secretmetadata: name: ceph-secret namespace: kube-systemtype: "kubernetes.io/rbd" data: key: QVFCaHplWlorTTJaQ3hBQVJXbHhwTnZXTnpEMXB0V1YzdEJyVHc9PQ== data.key is generated on one of the ceph mon nodes ceph auth get-key client.admin | base64 Create ceph user secretapiVersion: v1kind: Secretmetadata: name: ceph-user-secret namespace: defaultdata: key: QVFCZUJlZFpPNE5kS1JBQXEvY1lNanA1SURiWklYcTIwS2tvSVE9PQ==type: kubernetes.io/rbd data.key is generated on one of the Ceph `MON` nodes using ceph auth get-key client.kube | base64 使用Deploy rbd provisionerapiVersion: extensions/v1beta1kind: Deploymentmetadata: name: rbd-provisioner namespace: kube-systemspec: replicas: 1 strategy: type: Recreate template: metadata: labels: app: rbd-provisioner spec: containers: - name: rbd-provisioner image: "quay.io/external_storage/rbd-provisioner:latest" env: - name: PROVISIONER_NAME value: ceph.com/rbd serviceAccountName: persistent-volume-binder Must specifyserviceAccountName cause rbac was enabled Create storageclasskind: StorageClassapiVersion: storage.k8s.io/v1metadata: name: rbd annotations: storageclass.beta.kubernetes.io/is-default-class: "true"provisioner: ceph.com/rbdparameters: monitors: 172.20.10.91:6789,172.20.10.96:6789,172.20.10.97:6789 pool: kube adminId: admin adminSecretNamespace: kube-system adminSecretName: ceph-secret userId: kube userSecretName: ceph-user-secret imageFormat: "2" imageFeatures: layering 创建一个例子pvc.yamlapiVersion: v1kind: PersistentVolumeClaimmetadata: name: jenkins-home-claimspec: accessModes: - ReadWriteOnce resources: requests: storage: 10Gi storageClassName: rbd---apiVersion: v1kind: PersistentVolumeClaimmetadata: name: jenkins-ref-claimspec: accessModes: - ReadWriteOnce resources: requests: storage: 10Gi storageClassName: rbd deployment-svc.yamlapiVersion: extensions/v1beta1kind: Deploymentmetadata: name: jenkins namespace: defaultspec: replicas: 1 template: metadata: labels: app: jenkins name: jenkins spec: containers: - name: jenkins image: jenkins:alpine-latest ports: - containerPort: 8080 protocol: TCP livenessProbe: httpGet: path: / port: 9090 initialDelaySeconds: 30 timeoutSeconds: 30 volumeMounts: - mountPath: /var/run/docker.sock name: docker-sock readOnly: true - mountPath: /var/jenkins_home name: jenkins-home - mountPath: /usr/share/jenkins/ref name: jenkins-ref volumes: - name: docker-sock hostPath: path: /var/run/docker.sock - name: jenkins-home persistentVolumeClaim: claimName: jenkins-home-claim - name: jenkins-ref persistentVolumeClaim: claimName: jenkins-ref-claim---apiVersion: v1kind: Servicemetadata: labels: app: jenkins name: jenkins namespace: defaultspec: type: NodePort selector: app: jenkins ports: - port: 80 targetPort: 8080]]></content>
+      <categories>
+        <category>ceph</category>
+      </categories>
+      <tags>
+        <tag>k8s</tag>
+        <tag>ceph</tag>
+        <tag>rbd</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title><![CDATA[CephRBD集群安装]]></title>
+    <url>%2F2017%2F10%2F19%2FCephRBD%E9%9B%86%E7%BE%A4%E5%AE%89%E8%A3%85%2F</url>
+    <content type="text"><![CDATA[快速安装文档admin-node(ceph-deploy) osd扩容用户创建等工作useradd cephpasswd cephecho "ceph ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/ceph mon节点添加免密登录ssh-copy-id node04ssh-copy-id node05 ceph-deploysudo apt-get --assume-yes -q --no-install-recommends install -o Dpkg::Options::=--force-confnew ceph ceph-osd ceph-mds ceph-mon radosgw 之后 ceph-deploy install node04 node05ceph-deploy osd prepare node04:/u01 node05:/u01ceph-deploy osd activate node04:/u01 node05:/u01ceph-deploy admin node04 node05 都正常执行完的话ceph -w可以看到集群开始重新分配pg 遇到的问题health HEALTH_WARN 1 requests are blocked &gt; 32 sec 有可能是在数据迁移过程中, 用户正在对该数据块进行访问, 但访问还没有完成, 数据就迁移到别的 OSD 中, 那么就会导致有请求被 block, 对用户也是有影响的，解决方法 ceph@node01:~$ sudo ceph health detailHEALTH_WARN 1 requests are blocked &gt; 32 sec; 1 osds have slow requests1 ops are blocked &gt; 1048.58 sec on osd.11 osds have slow requestsceph@node01:~$ sudo ceph osd treeID WEIGHT TYPE NAME UP/DOWN REWEIGHT PRIMARY-AFFINITY -1 8.17778 root default -2 0.90919 host node01 0 0.90919 osd.0 up 1.00000 1.00000 -3 0.90919 host node02 1 0.90919 osd.1 up 1.00000 1.00000 -4 0.90919 host node03 2 0.90919 osd.2 up 1.00000 1.00000 -5 2.72510 host node04 3 2.72510 osd.3 up 1.00000 1.00000 -6 2.72510 host node05 4 2.72510 osd.4 up 1.00000 1.00000 可以看到是在osd.1上，在node02节点，在对应节点的重启osd服务 sudo /etc/init.d/ceph restart osd.1 在mon节点再执行sudo ceph -w可以看到集群已经恢复HEALTH_OK。 mon增加节点ceph admin节点修改ceph.conf文件[global]fsid = 53f0f4a4-8108-4373-a286-30866ea1d23c#mon_initial_members = node01#mon_host = 172.20.10.91mon_initial_members = node01, node06, node07mon_host = node01, node06, node07auth_cluster_required = cephxauth_service_required = cephxauth_client_required = cephxosd pool default size = 2[mon.node01]public_addr = 172.20.10.91[mon.node06]public_addr = 172.20.10.97[mon.node07]public_addr = 172.20.10.98 新增的mon节点为node06，node07 更新集群中节点的ceph的配置#ceph-deploy --overwrite-conf config push &lt;ceph-node0 ceph-node1 ...&gt;ceph-deploy --overwrite-conf config push node01 node02 node03 node04 node05 node06 node07 添加monitor到cluster#ceph-deploy mon add &lt;hostname&gt;ceph-deploy mon add node06ceph-deploy mon add node07 并确保monitor已经加入 ceph@node01:~$ sudo ceph quorum_status --format json-pretty&#123; "election_epoch": 14, "quorum": [ 0, 1, 2 ], "quorum_names": [ "node01", "node06", "node07" ], "quorum_leader_name": "node01", "monmap": &#123; "epoch": 3, "fsid": "53f0f4a4-8108-4373-a286-30866ea1d23c", "modified": "2017-12-28 12:08:17.138941", "created": "2017-10-31 10:52:55.395319", "mons": [ &#123; "rank": 0, "name": "node01", "addr": "172.20.10.91:6789\/0" &#125;, &#123; "rank": 1, "name": "node06", "addr": "172.20.10.97:6789\/0" &#125;, &#123; "rank": 2, "name": "node07", "addr": "172.20.10.98:6789\/0" &#125; ] &#125;&#125; 删除osd节点检查集群容量sudo ceph df#orsudo ceph osd df 临时disable scrubbingsudo ceph osd set noscrubsudo ceph osd set nodeep-scrub 限制back-fill以及recoveryosd_max_backfills = 1osd_recovery_max_active = 1osd_recovery_op_priority = 1 配置在/etc/ceph/ceph.conf 移除ceph osdosd节点停止服务sudo systemctl disable ceph-osd@&lt;osd_id&gt;sudo systemctl stop ceph-osd@&lt;osd_id&gt; &lt;osd_id&gt;从ceph的管理节点sudo ceph osd tree可以查看到对应节点的ID 在移除osd之前，需要先从存储集群中移出sudo ceph osd out &lt;osd_id&gt; 当执行完这个命令后，ceph会重新负载均衡集群并复制数据到其他的OSD节点 那么我们需要执行sudo ceph -w监视rebalancing的过程，等待集群重新恢复到active+clean的状态。 从CRUSH map中删除OSD，保证不再接受到数据sudo ceph osd crush remove osd.&lt;osd_id&gt; 删除OSD的认证keysudo ceph auth del osd.&lt;osd_id&gt; 上面的过程完成之后，最后移出osd sudo ceph osd rm &lt;osd_id&gt;]]></content>
+      <categories>
+        <category>ceph</category>
+      </categories>
+      <tags>
+        <tag>ceph</tag>
+        <tag>rbd</tag>
+      </tags>
+  </entry>
+</search>
