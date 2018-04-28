@@ -102,7 +102,7 @@
   <entry>
     <title><![CDATA[Harbor升级遇到的问题]]></title>
     <url>%2F2018%2F01%2F30%2FHarbor%E5%8D%87%E7%BA%A7%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98%2F</url>
-    <content type="text"><![CDATA[stop and remove the Harbor instancedocker-compose down backup databasedocker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] backup delete (or rename) the original database directoryrm -rf /data/database create a new harbor instance, in order to automatically recreate a new db instancedocker-compose up -d &amp;&amp; docker-compose stop restore database from backup file in /path/to/backupdocker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] restore upgrade db schema and migrate data(optional)docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql vmware/harbor-db-migrator:[tag] up head start the new harbor delete images from harbor registrydelete images via web uirun command in consoledocker-compose stopdocker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect --dry-run /etc/registry/config.yml Note the above option --dry-run will print the progress without removeing any data. let’s actually do the “cleaning” job docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect /etc/registry/config.yml start harbor docker-compose start]]></content>
+    <content type="text"><![CDATA[停止或移除Harbor实例docker-compose down 备份数据docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] backup 删除或者移动原数据库目录rm -rf /data/database 新建Harbor实例，完成数据库初始化docker-compose up -d &amp;&amp; docker-compose stop 从备份/path/to/backup中恢复数据docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] restore 更新数据库表并迁移数据(optional)docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql vmware/harbor-db-migrator:[tag] up head 启动Harbor实例 在Harbor中删除镜像在webUI界面点击删除在console执行命令，停止Harbordocker-compose stopdocker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect --dry-run /etc/registry/config.yml Note the above option --dry-run will print the progress without removeing any data. let’s actually do the “cleaning” job docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect /etc/registry/config.yml 启动Harbordocker-compose start]]></content>
       <categories>
         <category>k8s</category>
       </categories>
@@ -214,9 +214,9 @@
         <category>ceph</category>
       </categories>
       <tags>
-        <tag>k8s</tag>
         <tag>ceph</tag>
         <tag>rbd</tag>
+        <tag>k8s</tag>
       </tags>
   </entry>
   <entry>
