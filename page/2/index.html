@@ -538,7 +538,7 @@
                 
                   <span class="post-meta-item-text">Edited on</span>
                 
-                <time title="Modified: 2018-04-27 11:23:27" itemprop="dateModified" datetime="2018-04-27T11:23:27+08:00">2018-04-27</time>
+                <time title="Modified: 2018-05-03 17:04:51" itemprop="dateModified" datetime="2018-05-03T17:04:51+08:00">2018-05-03</time>
               
             
           </span>
@@ -654,6 +654,15 @@
 <p>这个将生成一个<code>statefulset</code>类型对象，并挂载了名为<code>alertmanager-main</code>的<code>secret</code>资源到容器内部的<code>/etc/alertmanager/config/alertmanager.yaml</code>路径。当需要更新配置文件时需要将<code>alertmanager.yaml</code>内容base64encode后更新到<code>alertmanager-main</code>的<code>Data</code>属性或者直接patch secret from file</p>
 </li>
 </ul>
+<h3 id="比较疑惑的地方"><a href="#比较疑惑的地方" class="headerlink" title="比较疑惑的地方"></a>比较疑惑的地方</h3><p>默认的<code>namespace</code>是<code>monitoring</code>，假如我把deployment/svc/servicemonitor都创建在其他命名空间例如<code>default</code>，operator并不会将这个servicemonitor配置到prometheus.yaml中，有两个原因导致</p>
+<ol>
+<li>由于<code>Prometheus</code>object的配置</li>
+</ol>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">serviceMonitorSelector:</span></span><br><span class="line"><span class="attr">  matchExpressions:</span></span><br><span class="line"><span class="attr">  - key:</span> <span class="string">k8s-app</span></span><br><span class="line"><span class="attr">    operator:</span> <span class="string">Exists</span></span><br></pre></td></tr></table></figure>
+<p>假如servicemonitor(以下简写sm)的<code>.metadata.labels</code>不包含<code>k8s-app</code>这个label的话会被忽略，处理方法修改sm添加label以及添加prometheus的serviceMonitorSelector</p>
+<ol start="2">
+<li><code>createConfig</code>函数中首先用LabelSelector去List出匹配的sm，具体逻辑在<code>selectServiceMonitors</code>，当<code>ServiceMonitorNamespaceSelector</code>为nil或Size为0时仅查找当前namespace。<br>如果想List所有ns的sm，则简单添加<a href="https://github.com/coreos/prometheus-operator/blob/master/example/prometheus-operator-crd/prometheus.crd.yaml#L2001" target="_blank" rel="noopener">serviceMonitorNamespaceSelector: {}</a></li>
+</ol>
 
           
         
