@@ -110,7 +110,7 @@
 <meta property="og:site_name" content="Dummy.">
 <meta property="og:description" content="reclaimPolicy: Retain默认为DELETE，会导致当删除PVC时，由storageclass自动生成的PV也会跟着删除，而这个PV可能已经保存了用户不需要删除的数据。所以设置reclaimPolicy: Retain，但是好像没有生效？ edit manuallykubectl get pvkubectl patch pv &amp;lt;your-pv-name&amp;gt; -p &amp;apo">
 <meta property="og:locale" content="en-US">
-<meta property="og:updated_time" content="2018-04-27T04:27:32.000Z">
+<meta property="og:updated_time" content="2018-05-08T02:32:03.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="StorageClass的ReclaimPolicy">
 <meta name="twitter:description" content="reclaimPolicy: Retain默认为DELETE，会导致当删除PVC时，由storageclass自动生成的PV也会跟着删除，而这个PV可能已经保存了用户不需要删除的数据。所以设置reclaimPolicy: Retain，但是好像没有生效？ edit manuallykubectl get pvkubectl patch pv &amp;lt;your-pv-name&amp;gt; -p &amp;apo">
@@ -361,7 +361,7 @@
                 
                   <span class="post-meta-item-text">Edited on</span>
                 
-                <time title="Modified: 2018-04-27 12:27:32" itemprop="dateModified" datetime="2018-04-27T12:27:32+08:00">2018-04-27</time>
+                <time title="Modified: 2018-05-08 10:32:03" itemprop="dateModified" datetime="2018-05-08T10:32:03+08:00">2018-05-08</time>
               
             
           </span>
@@ -430,7 +430,7 @@
 <p>最新的release的代码中<a href="https://github.com/kubernetes-incubator/external-storage/blob/master/ceph/rbd/pkg/provision/provision.go#L125" target="_blank" rel="noopener">provision.go</a>已经适配了k8s-1.8的api接口，支持了<code>PersistentVolumeReclaimPolicy</code></p>
 <p>但是<code>quay.io/external_storage/rbd-provisioner:latest</code> 这个镜像并没有更新推上去…</p>
 <p>手动编译打包并推到内部registry，然后修改deployment的image为内部仓库镜像即可</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">go get -u github.com/kubernetes-incubator/external-storage</span><br><span class="line"><span class="built_in">cd</span> ~/go/src/github.com/kubernetes-incubator/external-storage/ceph/rbd</span><br><span class="line">make push</span><br><span class="line"><span class="comment">#因为上面make push生产的tag是latest，所以我们需要手动给打上其他标签</span></span><br><span class="line">docker tag quay.io/external_storage/rbd-provisioner:latest hub.ppmoney.io/common/rbd-provisioner:latest</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">go get -u github.com/kubernetes-incubator/external-storage</span><br><span class="line"><span class="built_in">cd</span> ~/go/src/github.com/kubernetes-incubator/external-storage/ceph/rbd</span><br><span class="line">make push</span><br><span class="line"><span class="comment">#因为上面make push生产的tag是latest，所以我们需要手动给打上其他标签</span></span><br><span class="line">docker tag quay.io/external_storage/rbd-provisioner:latest hub.example.io/common/rbd-provisioner:latest</span><br></pre></td></tr></table></figure>
 <hr>
 <h4 id="ReclaimPolicy策略为Retain时回收Release状态的pv"><a href="#ReclaimPolicy策略为Retain时回收Release状态的pv" class="headerlink" title="ReclaimPolicy策略为Retain时回收Release状态的pv"></a>ReclaimPolicy策略为Retain时回收Release状态的pv</h4><p>查看到STATUS为Released的PV，直接删除delete pv的方式，provisioner并不会监听这些事件去删除实际在pool中的pv，所以我们需要给这个pv更新下属性</p>
 <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">kubectl get pv</span><br><span class="line">kubectl patch pv pvc-fce10e1d-c9e8-11e7-aa87-005056b12f99 --patch <span class="string">'&#123;"spec": &#123;"persistentVolumeReclaimPolicy": "Delete"&#125;&#125;'</span></span><br></pre></td></tr></table></figure>
