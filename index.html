@@ -298,6 +298,458 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/" itemprop="url">
+                  带你入门operator-framework
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-05-30 10:31:16 / Modified: 15:30:32" itemprop="dateCreated datePublished" datetime="2018-05-30T10:31:16+08:00">2018-05-30</time>
+            
+
+            
+              
+
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>在<a href="https://banzaicloud.com/" target="_blank" rel="noopener">Banzai Cloud</a>，我们一直在寻找新的创新技术，以支持我们的用户使用<a href="https://github.com/banzaicloud/pipeline" target="_blank" rel="noopener">Pipeline</a>过渡将微服务部署到Kubernetes。在最近几个月中，我们与<a href="https://coreos.com/" target="_blank" rel="noopener">CoreOS</a>和<a href="https://coreos.com/" target="_blank" rel="noopener">RedHat</a>合作共同开发<code>operators</code>，并且它现已在<a href="https://github.com/operator-framework" target="_blank" rel="noopener">GitHub</a>上开源。通过阅读这篇文章，您将了解到什么是<code>operator</code>，如何使用这个<code>operator sdk</code>开发一个我们在<a href="https://banzaicloud.com/" target="_blank" rel="noopener">Banzai Cloud</a>开发和使用的具体<code>operator</code>示例。我们的<a href="https://github.com/banzaicloud" target="_blank" rel="noopener">GitHub</a>上也有其他一些使用这个新的<code>operators SDK</code>开发的<code>operator</code>。</p>
+<h3 id="tl-dr"><a href="#tl-dr" class="headerlink" title="tl;dr:"></a>tl;dr:</h3><ul>
+<li>本博客中讨论的<code>operator</code>可以为任何基于JVM的应用程序提供无缝监控，而无需应用程序其提供监控数据抓取接口</li>
+</ul>
+<p>使用Kubernetes提供的对象接口在Kubernetes上部署和管理由多个相互依赖的组件/服务组成的复杂应用程序并不总是琐碎的。举一个简单的例子，如果应用程序需要提供最少数量的实例，这可以通过Kubernetes的部署来解决。但是如果这些实例当数量发生变化（升级/降级）且必须在运行时重新配置或重新初始化，那我们需要对这些事件做出反应并执行必要的重新配置步骤。尝试通过使用Kubernetes命令行工具实现的脚本来解决这些问题可能会非常麻烦，尤其是当我们必须处理弹性，日志收集和监控等更接近真实用例的问题的情况下。</p>
+<p>CoreOS引入了<a href="https://coreos.com/operators/" target="_blank" rel="noopener">operators</a>来自动化处理这些复杂的操作场景。简而言之<code>operators</code>通过TPR/<a href="https://kubernetes.io/docs/concepts/api-extension/custom-resources/" target="_blank" rel="noopener">CRD</a>扩展Kubernetes API，提供良好的粒度访问并控制集群内正在发生的事情。</p>
+<p>在进一步讨论之前，了解一些关于Kubernetes <strong><em>custom resources</em></strong>（以下简写为CR）的内容以便我们更好地理解<code>operator</code>到底是什么。Kubernetes中的<strong><em>resource</em></strong>是<a href="https://kubernetes.io/docs/reference/api-overview/" target="_blank" rel="noopener">Kubernetes API</a>中某存储一定的Kubernetes对象（例如Pod对象）类型的端点。一个CR本质上是一种资源，它可以被添加到Kubernetes中去扩展基本的Kubernetes API。当<strong><em>custom resources definition</em></strong>创建之后，用户可以像管理类似pods这种内置资源一样使用<code>kubectl</code>来管理这些对象资源。同时必须有一个控制器来处理通过<code>kubectl</code>创建的CR。自定义控制器是CR的控制器。总而言之，<code>operator</code>是一个可以处理某种类型的自定义资源的自定义控制器。</p>
+<p>CoreOS还开发了用于开发这样的<code>operators</code>的SDK。SDK提供了高级API来编写操作逻辑，并为其生成框架以帮助开发人员避免编写样板代码，大大简化了<code>operator</code>的实现。</p>
+<p>我们来看看如何使用这个<code>Operator SDK</code>。</p>
+<p>首先，我们需要将<code>Operator SDK</code>安装到我们的开发机器上。如果您想获取最新最好的体验，请从master分支安装CLI。当CLI安装完成之后，开发流程如下：</p>
+<h3 id="创建一个新的operator项目"><a href="#创建一个新的operator项目" class="headerlink" title="创建一个新的operator项目"></a>创建一个新的operator项目</h3><p>使用CLI工具创建一个新的operator项目。</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> cd $GOPATH/src/github.com/&lt;your-github-repo&gt;/</span><br><span class="line"><span class="meta">$</span> operator-sdk new &lt;operator-project-name&gt; --api-version=&lt;your-api-group&gt;/&lt;version&gt; --kind=&lt;custom-resource-kind&gt;</span><br><span class="line"><span class="meta">$</span> cd &lt;operator-project-name&gt;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>operator-project-name - CLI在该目录下生成项目框架</li>
+<li>your-api-group - 这是我们的<code>operator</code>处理的自定义资源的Kubernetes API组（例如mycompany.com）</li>
+<li>version - 这是<code>operator</code>处理的自定义资源的Kubernetes API版本（例如v1alpha，beta等，请参阅Kubernetes API版本控制）</li>
+<li>custom-resource-kind - 自定义资源类型的名称</li>
+</ul>
+<h3 id="定义要watch的Kubernetes资源（持续监听事件）"><a href="#定义要watch的Kubernetes资源（持续监听事件）" class="headerlink" title="定义要watch的Kubernetes资源（持续监听事件）"></a>定义要<code>watch</code>的Kubernetes资源（持续监听事件）</h3><p><code>cmd/&lt;operator-project-name&gt;</code>目录下的<code>main.go</code>为启动和初始化<code>operator</code>的主入口。这个文件是配置operator想要从Kubernetes中获取关于某类资源类型列表的通知的地方。</p>
+<h3 id="在指定的方法函数中定义operator的处理逻辑"><a href="#在指定的方法函数中定义operator的处理逻辑" class="headerlink" title="在指定的方法函数中定义operator的处理逻辑"></a>在指定的方法函数中定义operator的处理逻辑</h3><p>从Kubernetes获取到与被观察资源相关的事件将被引导到定义在<code>pkg/stub/handler.go</code>中的<code>func (h *Handler) Handle(ctx types.Context, event types.Event) error</code>函数。在这个函数里实现您的operator的处理逻辑，它负责对由Kubernetes发布的各种事件做出反应。</p>
+<p>每个自定义资源都需要定义结构体，我们创建的<code>operator</code>处理的自定义资源的结构必须定义在<code>pkg/apis/&lt;api-group&gt;/&lt;version&gt;</code>目录下的<code>types.go</code>文件中。我们可以在<code>Spec</code>字段来定义规范自定义资源的结构属性，还有一个<code>Status</code>字段用于补充描述自定义资源对象状态的信息。</p>
+<p><code>Operator SDK</code>提供了对Kubernetes资源执行CRUD操作函数：</p>
+<ul>
+<li>查询 - 定义用于检索群集中可用的Kubernetes资源的函数</li>
+<li>操作 - 定义用于创建，更新和删除Kubernetes资源的函数</li>
+</ul>
+<p>有关如何使用这些函数的更多详细信息，请参阅下面的具体<a href="https://banzaicloud.com/blog/operator-sdk/#the-prometheus-jmx-exporter-case" target="_blank" rel="noopener">operator</a>示例。</p>
+<h3 id="更新并生成自定义资源的代码"><a href="#更新并生成自定义资源的代码" class="headerlink" title="更新并生成自定义资源的代码"></a>更新并生成自定义资源的代码</h3><p>每当<code>types.go</code>文件有变更时，因为有一些代码文件依赖于<code>types.go</code>中定义的类型，所以它们需要重新生成。</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> operator-sdk generate k8s</span><br></pre></td></tr></table></figure>
+<h3 id="构建并生成operator的部署清单文件"><a href="#构建并生成operator的部署清单文件" class="headerlink" title="构建并生成operator的部署清单文件"></a>构建并生成operator的部署清单文件</h3><p>构建operator并生成部署文件。</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line">operator-sdk build &lt;your-docker-image&gt;</span><br></pre></td></tr></table></figure>
+<p>执行完以上命令后，一个包含operator二进制执行文件的docker镜像将被构建，我们需要将它推送到镜像仓库。<br>同时在<code>deploy</code>目录下会生成用于创建自定义资源和部署operator的部署文件。</p>
+<ul>
+<li>operator.yml - CRD以及operator的Deployment，每当<code>operator-sdk build &lt;your-docker-image&gt;</code>命令执行时，该文件的任何更改都会被覆盖</li>
+<li>cr.yaml - 一个自定义资源的例子</li>
+<li>rbac.yaml - 当集群启用了rbac的话需要配置权限</li>
+</ul>
+<h3 id="部署operator"><a href="#部署operator" class="headerlink" title="部署operator"></a>部署operator</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> kubectl create -f deploy/rbac.yaml</span><br><span class="line"><span class="meta">$</span> kubectl create -f deploy/operator.yaml</span><br></pre></td></tr></table></figure>
+<h3 id="创建自定义资源"><a href="#创建自定义资源" class="headerlink" title="创建自定义资源"></a>创建自定义资源</h3><p>一旦operator处于<code>Running</code>状态，您就可以开始创建您的自定义资源对象。在<code>deploy/cr.yaml</code>的<code>spec</code>部分填写您想要传递给operator的数据。<code>spec</code>结构必须符合<code>types.go</code>文件中的<code>Spec</code>字段结构。</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> kubectl create -f deploy/cr.yaml</span><br></pre></td></tr></table></figure>
+<p>查看群集中的自定义资源对象：</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> kubectl get &lt;custom-resource-kind&gt;</span><br></pre></td></tr></table></figure>
+<p>查看指定的自定义资源实例：</p>
+<figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span> kubectl get &lt;custom-resource-kind&gt; &lt;custom-resource-object-name&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="Prometheus-JMX-Exporter"><a href="#Prometheus-JMX-Exporter" class="headerlink" title="Prometheus JMX Exporter"></a>Prometheus JMX Exporter</h3><p>我们的PaaS <a href="https://github.com/banzaicloud/pipeline" target="_blank" rel="noopener">Pipeline</a>将应用程序部署到Kubernetes集群，并提供企业功能（如监控，集中式日志记录等）。</p>
+<p>我们使用Prometheus作为监控工具从我们部署的应用程序收集指标。如果您对我们为何选择Prometheus的原因感兴趣，请阅读我们的博客中的<a href="https://banzaicloud.com/blog/prometheus-application-monitoring/" target="_blank" rel="noopener">监控系列文章</a>。</p>
+<p>应用程序可不会自行向Prometheus发布度量指标，因此我们面临这样的问题：我们可以做些什么来启用这些应用程序向Prometheus发布指标（指开箱即用，毋需其他改造）。为Java应用程序编写的便捷组件<a href="https://github.com/prometheus/jmx_exporter" target="_blank" rel="noopener">Prometheus JMX Exporter</a>可以通过JMX从mBeans查询数据，并以Prometheus所需的格式暴露出这些数据。</p>
+<p>有以下几点要求：</p>
+<ul>
+<li>识别运行Java应用程序的pod，这些应用程序本身不会为Prometheus发布度量指标</li>
+<li>将Prometheus JMX Exporter Java代理注入到应用程序中以暴露指标</li>
+<li>为Prometheus JMX Exporter Java代理提供配置，指定哪些指标需要暴露出来</li>
+<li>使Prometheus服务器能够自动识别可从中获取指标的端点</li>
+<li>这些操作无侵入性（不应该重新启动pod）</li>
+</ul>
+<p>为了达到上面列出的要求，我们将执行相当多的操作，因此我们决定为它实现一个operator，接下来将让你了解我们是如何实现它的。</p>
+<p>只有在JVM启动时，<a href="https://github.com/prometheus/jmx_exporter" target="_blank" rel="noopener">Prometheus JMX Exporter</a>才能被加载到Java进程中。令人高兴的是，只需要做一些小小的改变就可以将其加载到已经运行的Java进程中。你可以看看我们的<a href="https://github.com/banzaicloud/jmx_exporter/commit/e83a7f123a983402aac2d831a716da4f4cd1ed5d" target="_blank" rel="noopener">jmx_exporter fork</a>中的改动。</p>
+<p>我们需要一个加载器将<code>JMX exporter Java</code>代理加载到由PID标识的正在运行的Java进程中。该加载器是一个相当小的应用程序，其源代码在<a href="https://github.com/banzaicloud/jmx-exporter-loader" target="_blank" rel="noopener">这里</a></p>
+<p><a href="https://github.com/prometheus/jmx_exporter" target="_blank" rel="noopener">Prometheus JMX Exporter</a>需要传入配置。我们将它的配置保存到Kubernetes的<a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/" target="_blank" rel="noopener">configmap</a>中。</p>
+<p>在<code>types.go</code>中定义我们的operator：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line"><span class="keyword">type</span> PrometheusJmxExporter <span class="keyword">struct</span> &#123;</span><br><span class="line">	metav1.TypeMeta   <span class="string">`json:",inline"`</span></span><br><span class="line">	metav1.ObjectMeta <span class="string">`json:"metadata"`</span></span><br><span class="line">	Spec              PrometheusJmxExporterSpec   <span class="string">`json:"spec"`</span></span><br><span class="line">	Status            PrometheusJmxExporterStatus <span class="string">`json:"status,omitempty"`</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> PrometheusJmxExporterSpec <span class="keyword">struct</span> &#123;</span><br><span class="line">	LabelSelector <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">string</span> <span class="string">`json:"labelSelector,required"`</span></span><br><span class="line">	Config        <span class="keyword">struct</span> &#123;</span><br><span class="line">		ConfigMapName <span class="keyword">string</span> <span class="string">`json:"configMapName,required"`</span></span><br><span class="line">		ConfigMapKey  <span class="keyword">string</span> <span class="string">`json:"configMapKey,required"`</span></span><br><span class="line">	&#125; <span class="string">`json:"config"`</span></span><br><span class="line">	Port <span class="keyword">int</span> <span class="string">`json: port,required`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>LabelSelector</code> - 指定标签以选择pod</li>
+<li><code>ConfigMapName</code>，<code>ConfigMapKey</code> - 包含Prometheus JMX Exporter配置的configmap</li>
+<li><code>Port</code> - 暴露给Prometheus服务器抓取指标的端口号</li>
+</ul>
+<p>创建自定义资源对象的示例yaml文件：</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">"banzaicloud.com/v1alpha1"</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">"PrometheusJmxExporter"</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">"example-prom-jmx-exp"</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  labelSelector:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">dummyapp</span></span><br><span class="line"><span class="attr">  config:</span></span><br><span class="line"><span class="attr">    configMapName:</span> <span class="string">prometheus-jmx-exporter-config</span></span><br><span class="line"><span class="attr">    configMapKey:</span> <span class="string">config.yaml</span></span><br><span class="line"><span class="attr">  port:</span> <span class="number">9400</span></span><br></pre></td></tr></table></figure>
+<p>自定义资源配置包含了operator需要根据<code>labelSelector</code>来处理哪些pod，用于暴露度量指标监听的端口以及用于运行exporter所需配置存在的configmap的信息。</p>
+<p><code>PrometheusJmxExporter</code>自定义资源对象的状态应列出基于其配置创建的度量标准端点，因此<code>Status</code>字段的结构为：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line"><span class="keyword">type</span> PrometheusJmxExporterStatus <span class="keyword">struct</span> &#123;</span><br><span class="line">	MetricsEndpoints []*MetricsEndpoint <span class="string">`json: metricsEndpoints,omitempty`</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> MetricsEndpoint <span class="keyword">struct</span> &#123;</span><br><span class="line">	Pod  <span class="keyword">string</span> <span class="string">`json:"pod,required"`</span></span><br><span class="line">	Port <span class="keyword">int</span>    <span class="string">`json:"port,required"`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Operator必须对与<code>PrometheusJmxExporter</code>自定义资源和<code>Pod</code>有关的事件做出相应操作，因此必须在这些类型的资源上设置监听（main.go）：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    ...</span><br><span class="line">    namespace := os.Getenv(<span class="string">"OPERATOR_NAMESPACE"</span>)</span><br><span class="line">    sdk.Watch(<span class="string">"banzaicloud.com/v1alpha1"</span>, <span class="string">"PrometheusJmxExporter"</span>, namespace, <span class="number">0</span>)</span><br><span class="line">    sdk.Watch(<span class="string">"v1"</span>, <span class="string">"Pod"</span>, namespace, <span class="number">0</span>)</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>处理与<code>PrometheusJmxExporter</code>自定义资源和<code>Pod</code>相关的事件的处理方法在<code>handler.go</code>以下位置定义：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(h *Handler)</span> <span class="title">Handle</span><span class="params">(ctx types.Context, event types.Event)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">    <span class="keyword">switch</span> o := event.Object.(<span class="keyword">type</span>) &#123;</span><br><span class="line">    <span class="keyword">case</span> *v1alpha1.PrometheusJmxExporter:</span><br><span class="line">        prometheusJmxExporter := o</span><br><span class="line">    ...</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">case</span> *v1.Pod:</span><br><span class="line">        pod := o</span><br><span class="line">    ...</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当<code>PrometheusJmxExporter</code>自定义资源对象被创建/更新时，operator将会执行以下：</p>
+<ol>
+<li>查询当前命名空间中所有标签与<code>PrometheusJmxExporter</code>自定义资源对象规范的<code>labelSelector</code>相匹配的所有pods。</li>
+<li>验证哪些pods已被处理以跳过</li>
+<li>处理未处理的pods</li>
+<li>使用新创建的指标端点更新当前<code>PrometheusJmxExporter</code>自定义资源的状态</li>
+</ol>
+<p>当创建/更新/删除Pod时，operator将会执行以下：</p>
+<ol>
+<li>搜索其中<code>labelSelector</code>与pod匹配的<code>PrometheusJmxExporter</code>自定义资源对象</li>
+<li>如果找到<code>PrometheusJmxExporter</code>自定义资源对象，则继续处理该pod</li>
+<li>用新创建的指标端点更新<code>PrometheusJmxExporter</code>自定义资源的状态</li>
+</ol>
+<p>为了查询Kubernetes资源，我们使用<code>Operator SDK</code>中的<code>query</code>包，例如：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line">podList := v1.PodList&#123;</span><br><span class="line">    TypeMeta: metav1.TypeMeta&#123;</span><br><span class="line">        Kind:       <span class="string">"Pod"</span>,</span><br><span class="line">        APIVersion: <span class="string">"v1"</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">listOptions := query.WithListOptions(&amp;metav1.ListOptions&#123;</span><br><span class="line">    LabelSelector:        labelSelector,</span><br><span class="line">    IncludeUninitialized: <span class="literal">false</span>,</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line">err := query.List(namespace, &amp;podList, listOptions)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">    logrus.Errorf(<span class="string">"Failed to query pods : %v"</span>, err)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line">jmxExporterList := v1alpha1.PrometheusJmxExporterList&#123;</span><br><span class="line">    TypeMeta: metav1.TypeMeta&#123;</span><br><span class="line">        Kind:       <span class="string">"PrometheusJmxExporter"</span>,</span><br><span class="line">        APIVersion: <span class="string">"banzaicloud.com/v1alpha1"</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">listOptions := query.WithListOptions(&amp;metav1.ListOptions&#123;</span><br><span class="line">    IncludeUninitialized: <span class="literal">false</span>,</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> err := query.List(namespace, &amp;jmxExporterList, listOptions); err != <span class="literal">nil</span> &#123;</span><br><span class="line">    logrus.Errorf(<span class="string">"Failed to query prometheusjmxexporters : %v"</span>, err)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>为了更新Kubernetes资源，我们使用<code>Operator SDK</code>中的<code>action</code>包，例如：</p>
+<figure class="highlight golang"><table><tr><td class="code"><pre><span class="line"><span class="comment">// update status</span></span><br><span class="line">newStatus := createPrometheusJmxExporterStatus(podList.Items)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> !prometheusJmxExporter.Status.Equals(newStatus) &#123;</span><br><span class="line">    prometheusJmxExporter.Status = createPrometheusJmxExporterStatus(podList.Items)</span><br><span class="line"></span><br><span class="line">    logrus.Infof(</span><br><span class="line">        <span class="string">"PrometheusJmxExporter: '%s/%s' : Update status"</span>,</span><br><span class="line">        prometheusJmxExporter.Namespace,</span><br><span class="line">        prometheusJmxExporter.Name)</span><br><span class="line"></span><br><span class="line">    action.Update(prometheusJmxExporter)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>处理pod过程由以下步骤组成：</p>
+<ol>
+<li>在pod的容器内执行<code>jps</code>以获取java进程的PID</li>
+<li>将<a href="https://github.com/prometheus/jmx_exporter" target="_blank" rel="noopener">Prometheus JMX Exporter</a>与<a href="https://github.com/banzaicloud/jmx-exporter-loader" target="_blank" rel="noopener">java agent loader</a>包复制到那些匹配的存在Java进程的容器中</li>
+<li>从configmap中读取exporter的配置，并将其作为配置文件复制到容器中</li>
+<li>在容器内运行agent loader以将exporter加载到Java进程中</li>
+<li>添加port到容器的暴露端口列表中，Prometheus服务器将能够抓取该端口</li>
+<li>给这个pod添加<code>prometheus.io/scrape</code>和<code>prometheus.io/port</code>注解，Prometheus将抓取包含这些注解的pod</li>
+<li>使用注解标记该pod已成功处理。</li>
+</ol>
+<p>由于Kubernetes API不支持在容器内直接执行命令，因此我们参考了<code>kubectl exec</code>以及<code>kubectl cp</code>的方法实现。</p>
+<p>以上<code>Prometheus JMX Exporter operator</code>源代码已提供在<a href="https://github.com/banzaicloud/prometheus-jmx-exporter-operator" target="_blank" rel="noopener">GitHub</a>上</p>
+<p>另外一篇关于<a href="https://banzaicloud.com/blog/prometheus-jmx-exporter-operator/" target="_blank" rel="noopener">Prometheus JMX Exporter operator</a>的实现。</p>
+<p>如果您对我们的技术和开源项目感兴趣，请在<a href="https://github.com/banzaicloud/pipeline" target="_blank" rel="noopener">GitHub</a>，LinkedIn或<a href="https://twitter.com/intent/follow?original_referer=https%3A%2F%2Fbanzaicloud.com%2Fblog%2Foperator-sdk%2F&amp;ref_src=twsrc%5Etfw&amp;region=follow_link&amp;screen_name=BanzaiCloud&amp;tw_p=followbutton" target="_blank" rel="noopener">Twitter</a>上关注我们：</p>
+<p><a href="https://banzaicloud.com/blog/operator-sdk/" target="_blank" rel="noopener">原文链接</a></p>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/05/30/Using-helm-to-manage-prometheus-operator/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/05/30/Using-helm-to-manage-prometheus-operator/" itemprop="url">
+                  使用helm安装管理prometheus-operator
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-05-30 09:27:53 / Modified: 10:15:30" itemprop="dateCreated datePublished" datetime="2018-05-30T09:27:53+08:00">2018-05-30</time>
+            
+
+            
+              
+
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/05/30/Using-helm-to-manage-prometheus-operator/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/05/30/Using-helm-to-manage-prometheus-operator/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h2 id="安装operator"><a href="#安装operator" class="headerlink" title="安装operator"></a>安装operator</h2><h3 id="添加kube-operator-custom-yaml覆写默认的值"><a href="#添加kube-operator-custom-yaml覆写默认的值" class="headerlink" title="添加kube-operator-custom.yaml覆写默认的值"></a>添加<code>kube-operator-custom.yaml</code>覆写默认的值</h3><p>这里主要是修改默认的repository，已将镜像从原始的地址下载下来并推送到内部的registry</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">global:</span></span><br><span class="line"><span class="attr">  hyperkube:</span></span><br><span class="line"><span class="attr">    repository:</span> <span class="string">hub.example.io/coreos/hyperkube</span></span><br><span class="line"><span class="attr">    tag:</span> <span class="string">v1.7.6_coreos.0</span></span><br><span class="line"><span class="attr">    pullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"></span><br><span class="line"><span class="attr">prometheusConfigReloader:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/prometheus-config-reloader</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.0.4</span></span><br><span class="line"></span><br><span class="line"><span class="attr">configmapReload:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/configmap-reload</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.0.1</span></span><br><span class="line"></span><br><span class="line"><span class="attr">image:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/prometheus-operator</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.19.0</span></span><br><span class="line"><span class="attr">  pullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"></span><br><span class="line"><span class="attr">kubeletService:</span></span><br><span class="line"><span class="attr">  enable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kubelet</span></span><br><span class="line"></span><br><span class="line"><span class="attr">rbacEnable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">pspEnable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">jobLabel:</span> <span class="string">prometheus-operator</span></span><br></pre></td></tr></table></figure>
+<h3 id="使用helm安装"><a href="#使用helm安装" class="headerlink" title="使用helm安装"></a>使用helm安装</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> helm install --namespace=monitoring -f kube-operator-custom.yaml coreos/prometheus-operator</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> <span class="comment"># 等待安装完成</span></span></span><br><span class="line"><span class="meta">$</span><span class="bash"> kubectl -n monitoring get po -w</span></span><br></pre></td></tr></table></figure>
+<h2 id="kube-prometheus"><a href="#kube-prometheus" class="headerlink" title="kube-prometheus"></a>kube-prometheus</h2><h3 id="添加kube-prometheus-custom-yaml覆写默认的值"><a href="#添加kube-prometheus-custom-yaml覆写默认的值" class="headerlink" title="添加kube-prometheus-custom.yaml覆写默认的值"></a>添加<code>kube-prometheus-custom.yaml</code>覆写默认的值</h3><p>主要仍是修改了依赖的chart的默认的<code>image</code>的路径以及添加了<code>storageSpec</code>，还有<code>exporter-kube-controller-manager</code>以及   <code>exporter-kube-scheduler</code>values中的<code>.serviceSelectorLabelKey</code>为<code>component</code>，默认为<code>k8s-app</code>，会导致service找不到对应的<code>endpoints</code>触发<code>K8SSchedulerDown</code>/<code>K8SControllerManagerDown</code>告警。</p>
+<h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> helm install --namespace=monitoring --name=kube-prometheus -f kube-prometheus-custom.yaml coreos/kube-prometheus</span></span><br></pre></td></tr></table></figure>
+<h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2><ul>
+<li>prometheus的targets中，<code>kubelet</code>的endpoints全部访问返回403，需要在kubelet的启动参数添加<code>--authentication-token-webhook</code>之后重启kubelet</li>
+</ul>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/04/27/如何基于CRD开发一个Controller/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1840,408 +2292,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/02/09/Kubelet-Volume-State-Metrics/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="fengxsong">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Dummy.">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/02/09/Kubelet-Volume-State-Metrics/" itemprop="url">
-                  Kubelet Volume State Metrics
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-
-            
-            
-            
-
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2018-02-09 18:20:34" itemprop="dateCreated datePublished" datetime="2018-02-09T18:20:34+08:00">2018-02-09</time>
-            
-
-            
-              
-
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 12:12:48" itemprop="dateModified" datetime="2018-04-27T12:12:48+08:00">2018-04-27</time>
-              
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2018/02/09/Kubelet-Volume-State-Metrics/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2018/02/09/Kubelet-Volume-State-Metrics/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>1.9.x版本存在这个问题<br>promethues监控pvc容量遇到的问题</p>
-<ul>
-<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/metrics/metrics.go</p>
-<p>| L206    func Register(containerCache kubecontainer.RuntimeCache)</p>
-</li>
-<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/kubelet.go</p>
-<p>| L591    klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)</p>
-<p>| L1317    kl.resourceAnalyzer.Start()</p>
-</li>
-<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/resource/_analyzer.go</p>
-<p>| L40/L47    func NewResourceAnalyzer(statsProvider StatsProvider, calVolumeFrequency time.Duration) ResourceAnalyzer.Start()</p>
-</li>
-<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/fs/_resource/_analyzer.go</p>
-<p>| L60    func (s *fsResourceAnalyzer) Start()</p>
-<p>| L72    func (s *fsResourceAnalyzer) updateCachedPodVolumeStats()</p>
-<p>| L88        entry.StopOnce()</p>
-</li>
-<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/volume/_stat/_calculator.go</p>
-<p>| L63    func (s <em>volumeStatCalculator) StartOnce() </em>volumeStatCalculator -&gt; wait.JitterUntil持续调用函数calcAndStoreStats，当stopChannel关闭时停止调用</p>
-<p>| L74    func (s <em>volumeStatCalculator) StopOnce() </em>volumeStatCalculator  -&gt; 关闭了stopChannel</p>
-</li>
-</ul>
-<p>此时仅停止已经删除的pods对应的volumeStatCalculator<br>即注册到prometheus metrics针对这个POD的PVC的指标不会再更新，但是仍然存在，这样exporter去采集的时候仍然采集到这个metric并入库到prometheus中。</p>
-<p>解决方法：</p>
-<ul>
-<li>当出现PVC容量告警时手动重启对应节点的kubelet？</li>
-<li>feature request：在entry.StopOnce()的同时重新Register关于VolumeStats的metrics，即调用unregister再register，<del>或者是不使用定时计算并缓存的方法而采用当prometheus去exporter采集时更新的方式？</del></li>
-<li>忽略这种问题，在prometheus的rule中修改expr规则？</li>
-</ul>
-<p>–volume-stats-agg-period duration Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.(default 1m0s)</p>
-<p><a href="https://github.com/kubernetes/kubernetes/issues/57686" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/57686</a></p>
-
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/01/30/Harbor升级遇到的问题/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="fengxsong">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Dummy.">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/01/30/Harbor升级遇到的问题/" itemprop="url">
-                  Harbor升级遇到的问题
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-
-            
-            
-            
-
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2018-01-30 18:45:06" itemprop="dateCreated datePublished" datetime="2018-01-30T18:45:06+08:00">2018-01-30</time>
-            
-
-            
-              
-
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-28 09:23:15" itemprop="dateModified" datetime="2018-04-28T09:23:15+08:00">2018-04-28</time>
-              
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2018/01/30/Harbor升级遇到的问题/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2018/01/30/Harbor升级遇到的问题/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h2 id="停止或移除Harbor实例"><a href="#停止或移除Harbor实例" class="headerlink" title="停止或移除Harbor实例"></a>停止或移除Harbor实例</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose down</span><br></pre></td></tr></table></figure>
-<h2 id="备份数据"><a href="#备份数据" class="headerlink" title="备份数据"></a>备份数据</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] backup</span><br></pre></td></tr></table></figure>
-<h2 id="删除或者移动原数据库目录"><a href="#删除或者移动原数据库目录" class="headerlink" title="删除或者移动原数据库目录"></a>删除或者移动原数据库目录</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">rm -rf /data/database</span><br></pre></td></tr></table></figure>
-<h2 id="新建Harbor实例，完成数据库初始化"><a href="#新建Harbor实例，完成数据库初始化" class="headerlink" title="新建Harbor实例，完成数据库初始化"></a>新建Harbor实例，完成数据库初始化</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose up -d &amp;&amp; docker-compose stop</span><br></pre></td></tr></table></figure>
-<h2 id="从备份-path-to-backup中恢复数据"><a href="#从备份-path-to-backup中恢复数据" class="headerlink" title="从备份/path/to/backup中恢复数据"></a>从备份/path/to/backup中恢复数据</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] restore</span><br></pre></td></tr></table></figure>
-<h2 id="更新数据库表并迁移数据-optional"><a href="#更新数据库表并迁移数据-optional" class="headerlink" title="更新数据库表并迁移数据(optional)"></a>更新数据库表并迁移数据(optional)</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql vmware/harbor-db-migrator:[tag] up head</span><br></pre></td></tr></table></figure>
-<h2 id="启动Harbor实例"><a href="#启动Harbor实例" class="headerlink" title="启动Harbor实例"></a>启动Harbor实例</h2><hr>
-<h1 id="在Harbor中删除镜像"><a href="#在Harbor中删除镜像" class="headerlink" title="在Harbor中删除镜像"></a>在Harbor中删除镜像</h1><h2 id="在webUI界面点击删除"><a href="#在webUI界面点击删除" class="headerlink" title="在webUI界面点击删除"></a>在webUI界面点击删除</h2><h2 id="在console执行命令，停止Harbor"><a href="#在console执行命令，停止Harbor" class="headerlink" title="在console执行命令，停止Harbor"></a>在console执行命令，停止Harbor</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose stop</span><br><span class="line">docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect --dry-run /etc/registry/config.yml</span><br></pre></td></tr></table></figure>
-<p><strong>Note</strong> the above option <code>--dry-run</code> will print the progress without removeing any data.</p>
-<p>let’s actually do the “cleaning” job</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect  /etc/registry/config.yml</span><br></pre></td></tr></table></figure>
-<h2 id="启动Harbor"><a href="#启动Harbor" class="headerlink" title="启动Harbor"></a>启动Harbor</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose start</span><br></pre></td></tr></table></figure>
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -2289,7 +2339,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">21</span>
+                    <span class="site-state-item-count">23</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
@@ -2347,7 +2397,11 @@
                     
                       
                     
-                    <span class="site-state-item-count">13</span>
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">15</span>
                     <span class="site-state-item-name">tags</span>
                   </a>
                 </div>

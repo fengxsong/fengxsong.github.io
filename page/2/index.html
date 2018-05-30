@@ -298,6 +298,408 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/02/09/Kubelet-Volume-State-Metrics/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/02/09/Kubelet-Volume-State-Metrics/" itemprop="url">
+                  Kubelet Volume State Metrics
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-02-09 18:20:34" itemprop="dateCreated datePublished" datetime="2018-02-09T18:20:34+08:00">2018-02-09</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-27 12:12:48" itemprop="dateModified" datetime="2018-04-27T12:12:48+08:00">2018-04-27</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/02/09/Kubelet-Volume-State-Metrics/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/02/09/Kubelet-Volume-State-Metrics/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>1.9.x版本存在这个问题<br>promethues监控pvc容量遇到的问题</p>
+<ul>
+<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/metrics/metrics.go</p>
+<p>| L206    func Register(containerCache kubecontainer.RuntimeCache)</p>
+</li>
+<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/kubelet.go</p>
+<p>| L591    klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)</p>
+<p>| L1317    kl.resourceAnalyzer.Start()</p>
+</li>
+<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/resource/_analyzer.go</p>
+<p>| L40/L47    func NewResourceAnalyzer(statsProvider StatsProvider, calVolumeFrequency time.Duration) ResourceAnalyzer.Start()</p>
+</li>
+<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/fs/_resource/_analyzer.go</p>
+<p>| L60    func (s *fsResourceAnalyzer) Start()</p>
+<p>| L72    func (s *fsResourceAnalyzer) updateCachedPodVolumeStats()</p>
+<p>| L88        entry.StopOnce()</p>
+</li>
+<li><p>go/src/k8s.io/kubernetes/pkg/kubelet/server/stats/volume/_stat/_calculator.go</p>
+<p>| L63    func (s <em>volumeStatCalculator) StartOnce() </em>volumeStatCalculator -&gt; wait.JitterUntil持续调用函数calcAndStoreStats，当stopChannel关闭时停止调用</p>
+<p>| L74    func (s <em>volumeStatCalculator) StopOnce() </em>volumeStatCalculator  -&gt; 关闭了stopChannel</p>
+</li>
+</ul>
+<p>此时仅停止已经删除的pods对应的volumeStatCalculator<br>即注册到prometheus metrics针对这个POD的PVC的指标不会再更新，但是仍然存在，这样exporter去采集的时候仍然采集到这个metric并入库到prometheus中。</p>
+<p>解决方法：</p>
+<ul>
+<li>当出现PVC容量告警时手动重启对应节点的kubelet？</li>
+<li>feature request：在entry.StopOnce()的同时重新Register关于VolumeStats的metrics，即调用unregister再register，<del>或者是不使用定时计算并缓存的方法而采用当prometheus去exporter采集时更新的方式？</del></li>
+<li>忽略这种问题，在prometheus的rule中修改expr规则？</li>
+</ul>
+<p>–volume-stats-agg-period duration Specifies interval for kubelet to calculate and cache the volume disk usage for all pods and volumes.(default 1m0s)</p>
+<p><a href="https://github.com/kubernetes/kubernetes/issues/57686" target="_blank" rel="noopener">https://github.com/kubernetes/kubernetes/issues/57686</a></p>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/01/30/Harbor升级遇到的问题/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/01/30/Harbor升级遇到的问题/" itemprop="url">
+                  Harbor升级遇到的问题
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-01-30 18:45:06" itemprop="dateCreated datePublished" datetime="2018-01-30T18:45:06+08:00">2018-01-30</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-28 09:23:15" itemprop="dateModified" datetime="2018-04-28T09:23:15+08:00">2018-04-28</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/30/Harbor升级遇到的问题/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/30/Harbor升级遇到的问题/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h2 id="停止或移除Harbor实例"><a href="#停止或移除Harbor实例" class="headerlink" title="停止或移除Harbor实例"></a>停止或移除Harbor实例</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose down</span><br></pre></td></tr></table></figure>
+<h2 id="备份数据"><a href="#备份数据" class="headerlink" title="备份数据"></a>备份数据</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] backup</span><br></pre></td></tr></table></figure>
+<h2 id="删除或者移动原数据库目录"><a href="#删除或者移动原数据库目录" class="headerlink" title="删除或者移动原数据库目录"></a>删除或者移动原数据库目录</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">rm -rf /data/database</span><br></pre></td></tr></table></figure>
+<h2 id="新建Harbor实例，完成数据库初始化"><a href="#新建Harbor实例，完成数据库初始化" class="headerlink" title="新建Harbor实例，完成数据库初始化"></a>新建Harbor实例，完成数据库初始化</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose up -d &amp;&amp; docker-compose stop</span><br></pre></td></tr></table></figure>
+<h2 id="从备份-path-to-backup中恢复数据"><a href="#从备份-path-to-backup中恢复数据" class="headerlink" title="从备份/path/to/backup中恢复数据"></a>从备份/path/to/backup中恢复数据</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql -v /path/to/backup:/harbor-migration/backup vmware/harbor-db-migrator:[tag] restore</span><br></pre></td></tr></table></figure>
+<h2 id="更新数据库表并迁移数据-optional"><a href="#更新数据库表并迁移数据-optional" class="headerlink" title="更新数据库表并迁移数据(optional)"></a>更新数据库表并迁移数据(optional)</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -ti --rm -e DB_USR=root -e DB_PWD=xxxx -v /data/database:/var/lib/mysql vmware/harbor-db-migrator:[tag] up head</span><br></pre></td></tr></table></figure>
+<h2 id="启动Harbor实例"><a href="#启动Harbor实例" class="headerlink" title="启动Harbor实例"></a>启动Harbor实例</h2><hr>
+<h1 id="在Harbor中删除镜像"><a href="#在Harbor中删除镜像" class="headerlink" title="在Harbor中删除镜像"></a>在Harbor中删除镜像</h1><h2 id="在webUI界面点击删除"><a href="#在webUI界面点击删除" class="headerlink" title="在webUI界面点击删除"></a>在webUI界面点击删除</h2><h2 id="在console执行命令，停止Harbor"><a href="#在console执行命令，停止Harbor" class="headerlink" title="在console执行命令，停止Harbor"></a>在console执行命令，停止Harbor</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose stop</span><br><span class="line">docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect --dry-run /etc/registry/config.yml</span><br></pre></td></tr></table></figure>
+<p><strong>Note</strong> the above option <code>--dry-run</code> will print the progress without removeing any data.</p>
+<p>let’s actually do the “cleaning” job</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker run -it --name gc --rm --volumes-from registry vmware/registry:2.6.2-photon garbage-collect  /etc/registry/config.yml</span><br></pre></td></tr></table></figure>
+<h2 id="启动Harbor"><a href="#启动Harbor" class="headerlink" title="启动Harbor"></a>启动Harbor</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker-compose start</span><br></pre></td></tr></table></figure>
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/01/29/使用ceph-exporter监控ceph集群/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1857,392 +2259,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2017/11/13/两种分配Pods的方式/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="fengxsong">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Dummy.">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2017/11/13/两种分配Pods的方式/" itemprop="url">
-                  两种分配Pods的方式
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-
-            
-            
-            
-
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2017-11-13 18:29:35" itemprop="dateCreated datePublished" datetime="2017-11-13T18:29:35+08:00">2017-11-13</time>
-            
-
-            
-              
-
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 09:02:26" itemprop="dateModified" datetime="2018-04-27T09:02:26+08:00">2018-04-27</time>
-              
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/11/13/两种分配Pods的方式/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/11/13/两种分配Pods的方式/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h3 id="使用nodeSelector"><a href="#使用nodeSelector" class="headerlink" title="使用nodeSelector"></a>使用nodeSelector</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl get nodes --show-labels</span><br></pre></td></tr></table></figure>
-<p>没有满足的labels时我们可以另外给node节点打标签</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl label nodes node02 ingress-instance=<span class="literal">true</span></span><br></pre></td></tr></table></figure>
-<p>删除label</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl label nodes node02 ingress-instance-</span><br></pre></td></tr></table></figure>
-<p>ds/deploy/sts等使用nodeSelector</p>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line">      <span class="string">...</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br></pre></td></tr></table></figure>
-<h3 id="Affinity-and-anti-affinity"><a href="#Affinity-and-anti-affinity" class="headerlink" title="Affinity and anti-affinity"></a>Affinity and anti-affinity</h3><ul>
-<li>requiredDuringSchedulingIgnoredDuringExecution</li>
-<li>preferredDuringSchedulingIgnoredDuringExecution</li>
-</ul>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Deployment</span></span><br><span class="line"><span class="string">...</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  affinity:</span></span><br><span class="line"><span class="attr">    nodeAffinity:</span></span><br><span class="line"><span class="attr">      requiredDuringSchedulingIgnoredDuringExecution:</span></span><br><span class="line"><span class="attr">        nodeSelectorTerms:</span></span><br><span class="line"><span class="attr">        - matchExpressions:</span></span><br><span class="line"><span class="attr">          - key:</span> <span class="string">ingress-instance</span></span><br><span class="line"><span class="attr">            operator:</span> <span class="string">In</span></span><br><span class="line"><span class="attr">            values:</span> <span class="string">"true"</span></span><br><span class="line"><span class="attr">      preferredDuringSchedulingIgnoredDuringExecution:</span></span><br><span class="line">        <span class="string">...</span></span><br></pre></td></tr></table></figure>
-<p><a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity" target="_blank" rel="noopener">REF</a></p>
-
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2017/10/19/K8s使用cephRDB块作为动态存储/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="fengxsong">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Dummy.">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2017/10/19/K8s使用cephRDB块作为动态存储/" itemprop="url">
-                  K8s使用cephRDB块作为动态存储
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-
-            
-            
-            
-
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2017-10-19 18:26:59" itemprop="dateCreated datePublished" datetime="2017-10-19T18:26:59+08:00">2017-10-19</time>
-            
-
-            
-              
-
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 12:26:14" itemprop="dateModified" datetime="2018-04-27T12:26:14+08:00">2018-04-27</time>
-              
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/ceph/" itemprop="url" rel="index"><span itemprop="name">ceph</span></a></span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/10/19/K8s使用cephRDB块作为动态存储/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/10/19/K8s使用cephRDB块作为动态存储/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h1 id="准备工作"><a href="#准备工作" class="headerlink" title="准备工作"></a>准备工作</h1><h2 id="Install-ceph-common-package"><a href="#Install-ceph-common-package" class="headerlink" title="Install ceph-common package"></a>Install ceph-common package</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt-get ceph-common</span><br></pre></td></tr></table></figure>
-<h2 id="Create-Pool-for-dynamic-volumes"><a href="#Create-Pool-for-dynamic-volumes" class="headerlink" title="Create Pool for dynamic volumes"></a>Create Pool for dynamic volumes</h2><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ ceph osd pool create kube 1024</span><br><span class="line">$ ceph auth get-or-create client.kube mon <span class="string">'allow r'</span> osd <span class="string">'allow class-read object_prefix rbd_children, allow rwx pool=kube'</span> -o ceph.client.kube.keyring</span><br></pre></td></tr></table></figure>
-<p>mon=<code>allow r</code>read mon to find osd<br>osd=<code>allow class-read object_prefix rbd_children, allow rwx pool=kube</code>read rbd_children prefix, full access to kube pool)</p>
-<h2 id="Creating-ceph-secret"><a href="#Creating-ceph-secret" class="headerlink" title="Creating ceph secret"></a>Creating ceph secret</h2><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Secret</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">ceph-secret</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">type:</span> <span class="string">"kubernetes.io/rbd"</span>  </span><br><span class="line"><span class="attr">data:</span></span><br><span class="line"><span class="attr">  key:</span> <span class="string">QVFCaHplWlorTTJaQ3hBQVJXbHhwTnZXTnpEMXB0V1YzdEJyVHc9PQ==</span></span><br></pre></td></tr></table></figure>
-<p><code>data.key</code> is generated on one of the ceph mon nodes</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ceph auth get-key client.admin | base64</span><br></pre></td></tr></table></figure>
-<h2 id="Create-ceph-user-secret"><a href="#Create-ceph-user-secret" class="headerlink" title="Create ceph user secret"></a>Create ceph user secret</h2><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Secret</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">ceph-user-secret</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">default</span></span><br><span class="line"><span class="attr">data:</span></span><br><span class="line"><span class="attr">  key:</span> <span class="string">QVFCZUJlZFpPNE5kS1JBQXEvY1lNanA1SURiWklYcTIwS2tvSVE9PQ==</span></span><br><span class="line"><span class="attr">type:</span> <span class="string">kubernetes.io/rbd</span></span><br></pre></td></tr></table></figure>
-<p><code>data.key</code> is generated on one of the Ceph `MON` nodes using </p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ceph auth get-key client.kube | base64</span><br></pre></td></tr></table></figure>
-<h1 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h1><h2 id="Deploy-rbd-provisioner"><a href="#Deploy-rbd-provisioner" class="headerlink" title="Deploy rbd provisioner"></a>Deploy rbd provisioner</h2><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Deployment</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">rbd-provisioner</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  replicas:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">  strategy:</span></span><br><span class="line"><span class="attr">    type:</span> <span class="string">Recreate</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        app:</span> <span class="string">rbd-provisioner</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">rbd-provisioner</span></span><br><span class="line"><span class="attr">        image:</span> <span class="string">"quay.io/external_storage/rbd-provisioner:latest"</span></span><br><span class="line"><span class="attr">        env:</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">PROVISIONER_NAME</span></span><br><span class="line"><span class="attr">          value:</span> <span class="string">ceph.com/rbd</span></span><br><span class="line"><span class="attr">      serviceAccountName:</span> <span class="string">persistent-volume-binder</span></span><br></pre></td></tr></table></figure>
-<p>Must specify<code>serviceAccountName</code> cause rbac was enabled</p>
-<h2 id="Create-storageclass"><a href="#Create-storageclass" class="headerlink" title="Create storageclass"></a>Create storageclass</h2><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">kind:</span> <span class="string">StorageClass</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">storage.k8s.io/v1</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">rbd</span></span><br><span class="line"><span class="attr">  annotations:</span></span><br><span class="line">    <span class="string">storageclass.beta.kubernetes.io/is-default-class:</span> <span class="string">"true"</span></span><br><span class="line"><span class="attr">provisioner:</span> <span class="string">ceph.com/rbd</span></span><br><span class="line"><span class="attr">parameters:</span></span><br><span class="line"><span class="attr">  monitors:</span> <span class="number">172.20</span><span class="number">.10</span><span class="number">.91</span><span class="string">:6789,172.20.10.96:6789,172.20.10.97:6789</span></span><br><span class="line"><span class="attr">  pool:</span> <span class="string">kube</span></span><br><span class="line"><span class="attr">  adminId:</span> <span class="string">admin</span></span><br><span class="line"><span class="attr">  adminSecretNamespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">  adminSecretName:</span> <span class="string">ceph-secret</span></span><br><span class="line"><span class="attr">  userId:</span> <span class="string">kube</span></span><br><span class="line"><span class="attr">  userSecretName:</span> <span class="string">ceph-user-secret</span></span><br><span class="line"><span class="attr">  imageFormat:</span> <span class="string">"2"</span></span><br><span class="line"><span class="attr">  imageFeatures:</span> <span class="string">layering</span></span><br></pre></td></tr></table></figure>
-<h2 id="创建一个例子"><a href="#创建一个例子" class="headerlink" title="创建一个例子"></a>创建一个例子</h2><h3 id="pvc-yaml"><a href="#pvc-yaml" class="headerlink" title="pvc.yaml"></a>pvc.yaml</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">PersistentVolumeClaim</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">jenkins-home-claim</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  accessModes:</span></span><br><span class="line"><span class="bullet">    -</span> <span class="string">ReadWriteOnce</span></span><br><span class="line"><span class="attr">  resources:</span></span><br><span class="line"><span class="attr">    requests:</span></span><br><span class="line"><span class="attr">      storage:</span> <span class="number">10</span><span class="string">Gi</span></span><br><span class="line"><span class="attr">  storageClassName:</span> <span class="string">rbd</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">PersistentVolumeClaim</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">jenkins-ref-claim</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  accessModes:</span></span><br><span class="line"><span class="bullet">    -</span> <span class="string">ReadWriteOnce</span></span><br><span class="line"><span class="attr">  resources:</span></span><br><span class="line"><span class="attr">    requests:</span></span><br><span class="line"><span class="attr">      storage:</span> <span class="number">10</span><span class="string">Gi</span></span><br><span class="line"><span class="attr">  storageClassName:</span> <span class="string">rbd</span></span><br></pre></td></tr></table></figure>
-<h3 id="deployment-svc-yaml"><a href="#deployment-svc-yaml" class="headerlink" title="deployment-svc.yaml"></a>deployment-svc.yaml</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Deployment</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">default</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  replicas:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        app:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">      name:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">        image:</span> <span class="attr">jenkins:alpine-latest</span></span><br><span class="line"><span class="attr">        ports:</span></span><br><span class="line"><span class="attr">        - containerPort:</span> <span class="number">8080</span></span><br><span class="line"><span class="attr">          protocol:</span> <span class="string">TCP</span></span><br><span class="line"><span class="attr">        livenessProbe:</span></span><br><span class="line"><span class="attr">          httpGet:</span></span><br><span class="line"><span class="attr">            path:</span> <span class="string">/</span></span><br><span class="line"><span class="attr">            port:</span> <span class="number">9090</span></span><br><span class="line"><span class="attr">          initialDelaySeconds:</span> <span class="number">30</span></span><br><span class="line"><span class="attr">          timeoutSeconds:</span> <span class="number">30</span></span><br><span class="line"><span class="attr">        volumeMounts:</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/var/run/docker.sock</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">docker-sock</span></span><br><span class="line"><span class="attr">          readOnly:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/var/jenkins_home</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">jenkins-home</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/usr/share/jenkins/ref</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">jenkins-ref</span></span><br><span class="line"><span class="attr">      volumes:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">docker-sock</span></span><br><span class="line"><span class="attr">        hostPath:</span></span><br><span class="line"><span class="attr">          path:</span> <span class="string">/var/run/docker.sock</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">jenkins-home</span></span><br><span class="line"><span class="attr">        persistentVolumeClaim:</span></span><br><span class="line"><span class="attr">          claimName:</span> <span class="string">jenkins-home-claim</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">jenkins-ref</span></span><br><span class="line"><span class="attr">        persistentVolumeClaim:</span></span><br><span class="line"><span class="attr">          claimName:</span> <span class="string">jenkins-ref-claim</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Service</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  labels:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">default</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  type:</span> <span class="string">NodePort</span></span><br><span class="line"><span class="attr">  selector:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">jenkins</span></span><br><span class="line"><span class="attr">  ports:</span></span><br><span class="line"><span class="attr">  - port:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">    targetPort:</span> <span class="number">8080</span></span><br></pre></td></tr></table></figure>
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -2290,7 +2306,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">21</span>
+                    <span class="site-state-item-count">23</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
@@ -2348,7 +2364,11 @@
                     
                       
                     
-                    <span class="site-state-item-count">13</span>
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">15</span>
                     <span class="site-state-item-name">tags</span>
                   </a>
                 </div>

@@ -102,25 +102,25 @@
 
 
 
-  <meta name="description" content="admission-controller开启PersistentVolumeClaimsResize expanding Persistent Volume Claims">
-<meta name="keywords" content="k8s,pvc">
+  <meta name="description" content="安装operator添加kube-operator-custom.yaml覆写默认的值这里主要是修改默认的repository，已将镜像从原始的地址下载下来并推送到内部的registry global:  hyperkube:    repository: hub.example.io/coreos/hyperkube    tag: v1.7.6_coreos.0    pullPolicy:">
+<meta name="keywords" content="helm">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Expanding PVC">
-<meta property="og:url" content="https://fengxsong.github.io/2018/01/18/Expanding-PVC/index.html">
+<meta property="og:title" content="使用helm安装管理prometheus-operator">
+<meta property="og:url" content="https://fengxsong.github.io/2018/05/30/Using-helm-to-manage-prometheus-operator/index.html">
 <meta property="og:site_name" content="Dummy.">
-<meta property="og:description" content="admission-controller开启PersistentVolumeClaimsResize expanding Persistent Volume Claims">
+<meta property="og:description" content="安装operator添加kube-operator-custom.yaml覆写默认的值这里主要是修改默认的repository，已将镜像从原始的地址下载下来并推送到内部的registry global:  hyperkube:    repository: hub.example.io/coreos/hyperkube    tag: v1.7.6_coreos.0    pullPolicy:">
 <meta property="og:locale" content="en-US">
-<meta property="og:updated_time" content="2018-04-27T04:00:11.000Z">
+<meta property="og:updated_time" content="2018-05-30T02:15:30.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Expanding PVC">
-<meta name="twitter:description" content="admission-controller开启PersistentVolumeClaimsResize expanding Persistent Volume Claims">
+<meta name="twitter:title" content="使用helm安装管理prometheus-operator">
+<meta name="twitter:description" content="安装operator添加kube-operator-custom.yaml覆写默认的值这里主要是修改默认的repository，已将镜像从原始的地址下载下来并推送到内部的registry global:  hyperkube:    repository: hub.example.io/coreos/hyperkube    tag: v1.7.6_coreos.0    pullPolicy:">
 
 
 
 
 
 
-  <link rel="canonical" href="https://fengxsong.github.io/2018/01/18/Expanding-PVC/"/>
+  <link rel="canonical" href="https://fengxsong.github.io/2018/05/30/Using-helm-to-manage-prometheus-operator/"/>
 
 
 
@@ -130,7 +130,7 @@
   };
 </script>
 
-  <title>Expanding PVC | Dummy.</title>
+  <title>使用helm安装管理prometheus-operator | Dummy.</title>
   
 
 
@@ -302,7 +302,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/01/18/Expanding-PVC/">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/05/30/Using-helm-to-manage-prometheus-operator/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="fengxsong">
@@ -319,7 +319,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Expanding PVC
+          <h1 class="post-title" itemprop="name headline">使用helm安装管理prometheus-operator
               
             
           </h1>
@@ -344,24 +344,12 @@
                 
               
 
-              <time title="Created: 2018-01-18 17:58:30" itemprop="dateCreated datePublished" datetime="2018-01-18T17:58:30+08:00">2018-01-18</time>
+              <time title="Created: 2018-05-30 09:27:53 / Modified: 10:15:30" itemprop="dateCreated datePublished" datetime="2018-05-30T09:27:53+08:00">2018-05-30</time>
             
 
             
               
 
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 12:00:11" itemprop="dateModified" datetime="2018-04-27T12:00:11+08:00">2018-04-27</time>
               
             
           </span>
@@ -393,9 +381,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2018/01/18/Expanding-PVC/#comments" itemprop="discussionUrl">
+                <a href="/2018/05/30/Using-helm-to-manage-prometheus-operator/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2018/01/18/Expanding-PVC/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2018/05/30/Using-helm-to-manage-prometheus-operator/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -423,9 +411,13 @@
       
 
       
-        <ul>
-<li><a href="https://kubernetes.io/docs/admin/admission-controllers/#persistentvolumeclaimresize" target="_blank" rel="noopener">admission-controller开启PersistentVolumeClaimsResize</a></li>
-<li><a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims" target="_blank" rel="noopener">expanding Persistent Volume Claims</a></li>
+        <h2 id="安装operator"><a href="#安装operator" class="headerlink" title="安装operator"></a>安装operator</h2><h3 id="添加kube-operator-custom-yaml覆写默认的值"><a href="#添加kube-operator-custom-yaml覆写默认的值" class="headerlink" title="添加kube-operator-custom.yaml覆写默认的值"></a>添加<code>kube-operator-custom.yaml</code>覆写默认的值</h3><p>这里主要是修改默认的repository，已将镜像从原始的地址下载下来并推送到内部的registry</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">global:</span></span><br><span class="line"><span class="attr">  hyperkube:</span></span><br><span class="line"><span class="attr">    repository:</span> <span class="string">hub.example.io/coreos/hyperkube</span></span><br><span class="line"><span class="attr">    tag:</span> <span class="string">v1.7.6_coreos.0</span></span><br><span class="line"><span class="attr">    pullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"></span><br><span class="line"><span class="attr">prometheusConfigReloader:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/prometheus-config-reloader</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.0.4</span></span><br><span class="line"></span><br><span class="line"><span class="attr">configmapReload:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/configmap-reload</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.0.1</span></span><br><span class="line"></span><br><span class="line"><span class="attr">image:</span></span><br><span class="line"><span class="attr">  repository:</span> <span class="string">hub.example.io/coreos/prometheus-operator</span></span><br><span class="line"><span class="attr">  tag:</span> <span class="string">v0.19.0</span></span><br><span class="line"><span class="attr">  pullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"></span><br><span class="line"><span class="attr">kubeletService:</span></span><br><span class="line"><span class="attr">  enable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kubelet</span></span><br><span class="line"></span><br><span class="line"><span class="attr">rbacEnable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">pspEnable:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">jobLabel:</span> <span class="string">prometheus-operator</span></span><br></pre></td></tr></table></figure>
+<h3 id="使用helm安装"><a href="#使用helm安装" class="headerlink" title="使用helm安装"></a>使用helm安装</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> helm install --namespace=monitoring -f kube-operator-custom.yaml coreos/prometheus-operator</span></span><br><span class="line"><span class="meta">$</span><span class="bash"> <span class="comment"># 等待安装完成</span></span></span><br><span class="line"><span class="meta">$</span><span class="bash"> kubectl -n monitoring get po -w</span></span><br></pre></td></tr></table></figure>
+<h2 id="kube-prometheus"><a href="#kube-prometheus" class="headerlink" title="kube-prometheus"></a>kube-prometheus</h2><h3 id="添加kube-prometheus-custom-yaml覆写默认的值"><a href="#添加kube-prometheus-custom-yaml覆写默认的值" class="headerlink" title="添加kube-prometheus-custom.yaml覆写默认的值"></a>添加<code>kube-prometheus-custom.yaml</code>覆写默认的值</h3><p>主要仍是修改了依赖的chart的默认的<code>image</code>的路径以及添加了<code>storageSpec</code>，还有<code>exporter-kube-controller-manager</code>以及   <code>exporter-kube-scheduler</code>values中的<code>.serviceSelectorLabelKey</code>为<code>component</code>，默认为<code>k8s-app</code>，会导致service找不到对应的<code>endpoints</code>触发<code>K8SSchedulerDown</code>/<code>K8SControllerManagerDown</code>告警。</p>
+<h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> helm install --namespace=monitoring --name=kube-prometheus -f kube-prometheus-custom.yaml coreos/kube-prometheus</span></span><br></pre></td></tr></table></figure>
+<h2 id="遇到的问题"><a href="#遇到的问题" class="headerlink" title="遇到的问题"></a>遇到的问题</h2><ul>
+<li>prometheus的targets中，<code>kubelet</code>的endpoints全部访问返回403，需要在kubelet的启动参数添加<code>--authentication-token-webhook</code>之后重启kubelet</li>
 </ul>
 
       
@@ -447,9 +439,7 @@
       
         <div class="post-tags">
           
-            <a href="/tags/k8s/" rel="tag"># k8s</a>
-          
-            <a href="/tags/pvc/" rel="tag"># pvc</a>
+            <a href="/tags/helm/" rel="tag"># helm</a>
           
         </div>
       
@@ -462,8 +452,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/12/25/Pod卡在terminated状态/" rel="next" title="Pod卡在terminated状态">
-                <i class="fa fa-chevron-left"></i> Pod卡在terminated状态
+              <a href="/2018/04/27/如何基于CRD开发一个Controller/" rel="next" title="如何基于CRD开发一个Controller">
+                <i class="fa fa-chevron-left"></i> 如何基于CRD开发一个Controller
               </a>
             
           </div>
@@ -472,8 +462,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2018/01/26/Prometheus-Operator/" rel="prev" title="Prometheus Operator">
-                Prometheus Operator <i class="fa fa-chevron-right"></i>
+              <a href="/2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/" rel="prev" title="带你入门operator-framework">
+                带你入门operator-framework <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -533,8 +523,17 @@
       
 
       
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
 
-      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+      <section class="site-overview-wrap sidebar-panel">
         <div class="site-overview">
           <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
             
@@ -651,6 +650,22 @@
         </div>
       </section>
 
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#安装operator"><span class="nav-text">安装operator</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#添加kube-operator-custom-yaml覆写默认的值"><span class="nav-text">添加kube-operator-custom.yaml覆写默认的值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#使用helm安装"><span class="nav-text">使用helm安装</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#kube-prometheus"><span class="nav-text">kube-prometheus</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#添加kube-prometheus-custom-yaml覆写默认的值"><span class="nav-text">添加kube-prometheus-custom.yaml覆写默认的值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#安装"><span class="nav-text">安装</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#遇到的问题"><span class="nav-text">遇到的问题</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
       
 
       
@@ -806,9 +821,9 @@
   
     <script type="text/javascript">
       var disqus_config = function () {
-        this.page.url = 'https://fengxsong.github.io/2018/01/18/Expanding-PVC/';
-        this.page.identifier = '2018/01/18/Expanding-PVC/';
-        this.page.title = 'Expanding PVC';
+        this.page.url = 'https://fengxsong.github.io/2018/05/30/Using-helm-to-manage-prometheus-operator/';
+        this.page.identifier = '2018/05/30/Using-helm-to-manage-prometheus-operator/';
+        this.page.title = '使用helm安装管理prometheus-operator';
       };
       function loadComments () {
         var d = document, s = d.createElement('script');
