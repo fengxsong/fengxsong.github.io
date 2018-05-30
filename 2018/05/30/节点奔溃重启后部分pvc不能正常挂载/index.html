@@ -102,25 +102,25 @@
 
 
 
-  <meta name="description" content="使用nodeSelector$ kubectl get nodes --show-labels 没有满足的labels时我们可以另外给node节点打标签 $ kubectl label nodes node02 ingress-instance=true 删除label $ kubectl label nodes node02 ingress-instance- ds/deploy/sts等使用n">
-<meta name="keywords" content="k8s">
+  <meta name="description" content="故障发生因没有配置deployment的资源限制，有几个有问题的pod占用了某个节点大量的CPU以及Mem最终导致节点crashed重启，pod被reschedule到其他的node节点后一直处于ContainerCreating的状态，kubectl describe pod看到报错Multi-Attach error for volume &amp;quot;pvc-76b54b6c-df46-11e">
+<meta name="keywords" content="rbd,pvc">
 <meta property="og:type" content="article">
-<meta property="og:title" content="两种分配Pods的方式">
-<meta property="og:url" content="https://fengxsong.github.io/2017/11/13/两种分配Pods的方式/index.html">
+<meta property="og:title" content="节点奔溃重启后部分pvc不能正常挂载">
+<meta property="og:url" content="https://fengxsong.github.io/2018/05/30/节点奔溃重启后部分pvc不能正常挂载/index.html">
 <meta property="og:site_name" content="Dummy.">
-<meta property="og:description" content="使用nodeSelector$ kubectl get nodes --show-labels 没有满足的labels时我们可以另外给node节点打标签 $ kubectl label nodes node02 ingress-instance=true 删除label $ kubectl label nodes node02 ingress-instance- ds/deploy/sts等使用n">
+<meta property="og:description" content="故障发生因没有配置deployment的资源限制，有几个有问题的pod占用了某个节点大量的CPU以及Mem最终导致节点crashed重启，pod被reschedule到其他的node节点后一直处于ContainerCreating的状态，kubectl describe pod看到报错Multi-Attach error for volume &amp;quot;pvc-76b54b6c-df46-11e">
 <meta property="og:locale" content="en-US">
-<meta property="og:updated_time" content="2018-04-27T01:02:26.000Z">
+<meta property="og:updated_time" content="2018-05-30T09:12:17.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="两种分配Pods的方式">
-<meta name="twitter:description" content="使用nodeSelector$ kubectl get nodes --show-labels 没有满足的labels时我们可以另外给node节点打标签 $ kubectl label nodes node02 ingress-instance=true 删除label $ kubectl label nodes node02 ingress-instance- ds/deploy/sts等使用n">
+<meta name="twitter:title" content="节点奔溃重启后部分pvc不能正常挂载">
+<meta name="twitter:description" content="故障发生因没有配置deployment的资源限制，有几个有问题的pod占用了某个节点大量的CPU以及Mem最终导致节点crashed重启，pod被reschedule到其他的node节点后一直处于ContainerCreating的状态，kubectl describe pod看到报错Multi-Attach error for volume &amp;quot;pvc-76b54b6c-df46-11e">
 
 
 
 
 
 
-  <link rel="canonical" href="https://fengxsong.github.io/2017/11/13/两种分配Pods的方式/"/>
+  <link rel="canonical" href="https://fengxsong.github.io/2018/05/30/节点奔溃重启后部分pvc不能正常挂载/"/>
 
 
 
@@ -130,7 +130,7 @@
   };
 </script>
 
-  <title>两种分配Pods的方式 | Dummy.</title>
+  <title>节点奔溃重启后部分pvc不能正常挂载 | Dummy.</title>
   
 
 
@@ -302,7 +302,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2017/11/13/两种分配Pods的方式/">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/05/30/节点奔溃重启后部分pvc不能正常挂载/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="fengxsong">
@@ -319,7 +319,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">两种分配Pods的方式
+          <h1 class="post-title" itemprop="name headline">节点奔溃重启后部分pvc不能正常挂载
               
             
           </h1>
@@ -344,24 +344,12 @@
                 
               
 
-              <time title="Created: 2017-11-13 18:29:35" itemprop="dateCreated datePublished" datetime="2017-11-13T18:29:35+08:00">2017-11-13</time>
+              <time title="Created: 2018-05-30 16:35:22 / Modified: 17:12:17" itemprop="dateCreated datePublished" datetime="2018-05-30T16:35:22+08:00">2018-05-30</time>
             
 
             
               
 
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 09:02:26" itemprop="dateModified" datetime="2018-04-27T09:02:26+08:00">2018-04-27</time>
               
             
           </span>
@@ -393,9 +381,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/11/13/两种分配Pods的方式/#comments" itemprop="discussionUrl">
+                <a href="/2018/05/30/节点奔溃重启后部分pvc不能正常挂载/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/11/13/两种分配Pods的方式/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2018/05/30/节点奔溃重启后部分pvc不能正常挂载/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -423,19 +411,19 @@
       
 
       
-        <h3 id="使用nodeSelector"><a href="#使用nodeSelector" class="headerlink" title="使用nodeSelector"></a>使用nodeSelector</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl get nodes --show-labels</span><br></pre></td></tr></table></figure>
-<p>没有满足的labels时我们可以另外给node节点打标签</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl label nodes node02 ingress-instance=<span class="literal">true</span></span><br></pre></td></tr></table></figure>
-<p>删除label</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ kubectl label nodes node02 ingress-instance-</span><br></pre></td></tr></table></figure>
-<p>ds/deploy/sts等使用nodeSelector</p>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line">      <span class="string">...</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br></pre></td></tr></table></figure>
-<h3 id="Affinity-and-anti-affinity"><a href="#Affinity-and-anti-affinity" class="headerlink" title="Affinity and anti-affinity"></a>Affinity and anti-affinity</h3><ul>
-<li>requiredDuringSchedulingIgnoredDuringExecution</li>
-<li>preferredDuringSchedulingIgnoredDuringExecution</li>
-</ul>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Deployment</span></span><br><span class="line"><span class="string">...</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  affinity:</span></span><br><span class="line"><span class="attr">    nodeAffinity:</span></span><br><span class="line"><span class="attr">      requiredDuringSchedulingIgnoredDuringExecution:</span></span><br><span class="line"><span class="attr">        nodeSelectorTerms:</span></span><br><span class="line"><span class="attr">        - matchExpressions:</span></span><br><span class="line"><span class="attr">          - key:</span> <span class="string">ingress-instance</span></span><br><span class="line"><span class="attr">            operator:</span> <span class="string">In</span></span><br><span class="line"><span class="attr">            values:</span> <span class="string">"true"</span></span><br><span class="line"><span class="attr">      preferredDuringSchedulingIgnoredDuringExecution:</span></span><br><span class="line">        <span class="string">...</span></span><br></pre></td></tr></table></figure>
-<p><a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity" target="_blank" rel="noopener">REF</a></p>
+        <h2 id="故障发生"><a href="#故障发生" class="headerlink" title="故障发生"></a>故障发生</h2><p>因没有配置deployment的资源限制，有几个有问题的pod占用了某个节点大量的CPU以及Mem最终导致节点crashed重启，pod被reschedule到其他的node节点后一直处于<code>ContainerCreating</code>的状态，<code>kubectl describe pod</code>看到报错<code>Multi-Attach error for volume &quot;pvc-76b54b6c-df46-11e7-a2f0-005056b12f99&quot; Volume is already exclusively attached to one node and can&#39;t be attached to another</code>。<br>原因是rbd image仍然有watcher存在，导致其他node不能正常mount(map) image</p>
+<h2 id="故障处理"><a href="#故障处理" class="headerlink" title="故障处理"></a>故障处理</h2><h3 id="查看pv对应哪个rbd-image"><a href="#查看pv对应哪个rbd-image" class="headerlink" title="查看pv对应哪个rbd image"></a>查看pv对应哪个rbd image</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line">kubectl get pv pvc-76b54b6c-df46-11e7-a2f0-005056b12f99 -o go-template='&#123;&#123;.spec.rbd.image&#125;&#125;'</span><br></pre></td></tr></table></figure>
+<h3 id="查看rbd-image的watcher"><a href="#查看rbd-image的watcher" class="headerlink" title="查看rbd image的watcher"></a>查看rbd image的watcher</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> sudo rbd status kubernetes-dynamic-pvc-76b716fd-df46-11e7-809b-0a580af40320 -p kube</span></span><br><span class="line">Watchers:</span><br><span class="line">        watcher=172.20.10.105:0/1787993098 client.205213 cookie=55</span><br></pre></td></tr></table></figure>
+<p>可以看到节点<code>172.20.10.105</code>仍map着这个image</p>
+<h3 id="登陆节点查看rbd-images-mapped关系"><a href="#登陆节点查看rbd-images-mapped关系" class="headerlink" title="登陆节点查看rbd images mapped关系"></a>登陆节点查看rbd images mapped关系</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> sudo rbd showmapped | grep kubernetes-dynamic-pvc-76b716fd-df46-11e7-809b-0a580af40320</span></span><br><span class="line">8  kube kubernetes-dynamic-pvc-76b716fd-df46-11e7-809b-0a580af40320 -    /dev/rbd8</span><br></pre></td></tr></table></figure>
+<p>可看到image被挂载在/dev/rbd8</p>
+<h3 id="unmap-image"><a href="#unmap-image" class="headerlink" title="unmap image"></a>unmap image</h3><figure class="highlight console"><table><tr><td class="code"><pre><span class="line">sudo rbd unmap /dev/rbd8</span><br></pre></td></tr></table></figure>
+<p>再次查看watcher已经没有了，等待一会可以看到pod开始挂载image，正常来说是没问题到了，但是通过describe看到报错</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">  Warning  FailedMount            16s (x2 over 24s)  kubelet, node08          MountVolume.MountDevice failed for volume &quot;pvc-76b54b6c-df46-11e7-a2f0-005056b12f99&quot; : rbd: failed to mount device /dev/rbd8 at /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd/kube-image-kubernetes-dynamic-pvc-76b716fd-df46-11e7-809b-0a580af40320 (fstype: ), error &apos;fsck&apos; found errors on device /dev/rbd8 but could not correct them: fsck from util-linux 2.27.1</span><br><span class="line">/dev/rbd8 contains a file system with errors, check forced.</span><br><span class="line">/dev/rbd8: Unattached inode 303</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">/dev/rbd8: UNEXPECTED INCONSISTENCY; RUN fsck MANUALLY.</span><br><span class="line">  (i.e., without -a or -p options)</span><br></pre></td></tr></table></figure>
+<p>提示卷发生文件系统错误，那么我们需要登陆到node08上运行fsck，保险起见可先尝试对rbd做snapshot镜像，<a href="https://ceph.com/planet/recovering-data-from-a-rbd-image/" target="_blank" rel="noopener">参考</a></p>
+<p>执行修复</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">sudo fsck -fv /dev/rbd8 </span><br><span class="line">fsck from util-linux 2.27.1</span><br><span class="line">e2fsck 1.42.13 (17-May-2015)</span><br><span class="line">Pass 1: Checking inodes, blocks, and sizes</span><br><span class="line">Pass 2: Checking directory structure</span><br><span class="line">Pass 3: Checking directory connectivity</span><br><span class="line">Pass 4: Checking reference counts</span><br><span class="line">Unattached inode 303</span><br><span class="line">Connect to /lost+found&lt;y&gt;? yes</span><br><span class="line">Inode 303 ref count is 2, should be 1.  Fix&lt;y&gt;? yes</span><br><span class="line">Pass 5: Checking group summary information</span><br><span class="line">Block bitmap differences:  -(71680--73727) -(94208--95231)</span><br><span class="line">Fix&lt;y&gt;? yes</span><br><span class="line"></span><br><span class="line">/dev/rbd8: ***** FILE SYSTEM WAS MODIFIED *****</span><br><span class="line"></span><br><span class="line">         326 inodes used (0.50%, out of 65536)</span><br><span class="line">          35 non-contiguous files (10.7%)</span><br><span class="line">           0 non-contiguous directories (0.0%)</span><br><span class="line">             # of inodes with ind/dind/tind blocks: 0/0/0</span><br><span class="line">             Extent depth histogram: 311/7</span><br><span class="line">       63642 blocks used (24.28%, out of 262144)</span><br><span class="line">           0 bad blocks</span><br><span class="line">           1 large file</span><br><span class="line"></span><br><span class="line">         308 regular files</span><br><span class="line">           9 directories</span><br><span class="line">           0 character device files</span><br><span class="line">           0 block device files</span><br><span class="line">           0 fifos</span><br><span class="line">           1 link</span><br><span class="line">           0 symbolic links (0 fast symbolic links)</span><br><span class="line">           0 sockets</span><br><span class="line">------------</span><br><span class="line">         317 files</span><br></pre></td></tr></table></figure>
+<p>修复完成，等待一会之后可观察到pod已能正常挂载上image并启动。</p>
 
       
     </div>
@@ -456,7 +444,9 @@
       
         <div class="post-tags">
           
-            <a href="/tags/k8s/" rel="tag"># k8s</a>
+            <a href="/tags/rbd/" rel="tag"># rbd</a>
+          
+            <a href="/tags/pvc/" rel="tag"># pvc</a>
           
         </div>
       
@@ -469,8 +459,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/10/19/K8s使用cephRDB块作为动态存储/" rel="next" title="K8s使用cephRDB块作为动态存储">
-                <i class="fa fa-chevron-left"></i> K8s使用cephRDB块作为动态存储
+              <a href="/2018/05/30/a-complete-guide-to-kubernetes-operator-SDK/" rel="next" title="带你入门operator-framework">
+                <i class="fa fa-chevron-left"></i> 带你入门operator-framework
               </a>
             
           </div>
@@ -478,10 +468,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2017/11/15/IngressController与IPVS/" rel="prev" title="IngressController与IPVS">
-                IngressController与IPVS <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -679,7 +665,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#使用nodeSelector"><span class="nav-text">使用nodeSelector</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Affinity-and-anti-affinity"><span class="nav-text">Affinity and anti-affinity</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#故障发生"><span class="nav-text">故障发生</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#故障处理"><span class="nav-text">故障处理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#查看pv对应哪个rbd-image"><span class="nav-text">查看pv对应哪个rbd image</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查看rbd-image的watcher"><span class="nav-text">查看rbd image的watcher</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#登陆节点查看rbd-images-mapped关系"><span class="nav-text">登陆节点查看rbd images mapped关系</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#unmap-image"><span class="nav-text">unmap image</span></a></li></ol></li></ol></div>
             
 
           </div>
@@ -840,9 +826,9 @@
   
     <script type="text/javascript">
       var disqus_config = function () {
-        this.page.url = 'https://fengxsong.github.io/2017/11/13/两种分配Pods的方式/';
-        this.page.identifier = '2017/11/13/两种分配Pods的方式/';
-        this.page.title = '两种分配Pods的方式';
+        this.page.url = 'https://fengxsong.github.io/2018/05/30/节点奔溃重启后部分pvc不能正常挂载/';
+        this.page.identifier = '2018/05/30/节点奔溃重启后部分pvc不能正常挂载/';
+        this.page.title = '节点奔溃重启后部分pvc不能正常挂载';
       };
       function loadComments () {
         var d = document, s = d.createElement('script');

@@ -298,6 +298,196 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/02/23/K8s针对资源紧缺处理/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="fengxsong">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Dummy.">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2018/02/23/K8s针对资源紧缺处理/" itemprop="url">
+                  K8s针对资源紧缺处理
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+
+            
+            
+            
+
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-02-23 18:19:21" itemprop="dateCreated datePublished" datetime="2018-02-23T18:19:21+08:00">2018-02-23</time>
+            
+
+            
+              
+
+              
+                
+                <span class="post-meta-divider">|</span>
+                
+
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2018-04-27 12:11:14" itemprop="dateModified" datetime="2018-04-27T12:11:14+08:00">2018-04-27</time>
+              
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">In</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/02/23/K8s针对资源紧缺处理/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/02/23/K8s针对资源紧缺处理/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>当前部分node节点可用内存经常低至2Gi，导致prometheus频繁报警。</p>
+<p>调整了告警的规则</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">- alert:</span> <span class="string">NodeMemRunningOut</span></span><br><span class="line"><span class="attr">  expr:</span> <span class="string">node_memory_MemAvailable/1024/1024/1024</span> <span class="string">&lt;=</span> <span class="number">2</span></span><br><span class="line"><span class="attr">  for:</span> <span class="number">10</span><span class="string">m</span></span><br><span class="line"><span class="attr">  labels:</span></span><br><span class="line"><span class="attr">    severity:</span> <span class="string">critical</span></span><br><span class="line"><span class="attr">  annotations:</span></span><br><span class="line"><span class="attr">    description:</span> <span class="string">"节点 <span class="template-variable">&#123;&#123;$labels.instance&#125;&#125;</span> 可用内存将耗尽, 剩余比例 <span class="template-variable">&#123;&#123; $value &#125;&#125;</span>"</span></span><br></pre></td></tr></table></figure>
+<p>再设置kubelet的启动项，添加如下</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">--eviction-hard=memory.available&lt;1.5Gi,nodefs.available&lt;10%,nodefs.inodesFree&lt;5% --system-reserved=memory=3Gi</span><br></pre></td></tr></table></figure>
+<p>当可用内存小于1.5Gi的时候，强制杀死该node节点上的pod，重新分配到其他节点。</p>
+<p>系统服务所需使用最下内存为3Gi。</p>
+<p>重启kubelet服务。</p>
+<p>其实还是要规划计算好单个container的request/limit的值</p>
+<p><a href="https://kubernetes.io/docs/tasks/administer-cluster/out-of-resource/" target="_blank" rel="noopener">https://kubernetes.io/docs/tasks/administer-cluster/out-of-resource/</a></p>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2018/02/09/Kubelet-Volume-State-Metrics/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2043,222 +2233,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="https://fengxsong.github.io/2017/11/15/IngressController与IPVS/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="fengxsong">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Dummy.">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2017/11/15/IngressController与IPVS/" itemprop="url">
-                  IngressController与IPVS
-                </a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-
-            
-            
-            
-
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2017-11-15 18:07:09" itemprop="dateCreated datePublished" datetime="2017-11-15T18:07:09+08:00">2017-11-15</time>
-            
-
-            
-              
-
-              
-                
-                <span class="post-meta-divider">|</span>
-                
-
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2018-04-27 12:24:43" itemprop="dateModified" datetime="2018-04-27T12:24:43+08:00">2018-04-27</time>
-              
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">In</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing"><a href="/categories/k8s/" itemprop="url" rel="index"><span itemprop="name">k8s</span></a></span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-              <span class="post-comments-count">
-                <span class="post-meta-divider">|</span>
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-comment-o"></i>
-                </span>
-                <a href="/2017/11/15/IngressController与IPVS/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/11/15/IngressController与IPVS/" itemprop="commentCount"></span>
-                </a>
-              </span>
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h1 id="更新"><a href="#更新" class="headerlink" title="更新"></a>更新</h1><p><strong>April.20 Update:</strong><br>可参考或是直接试用caicloud的开源实现 <a href="https://github.com/caicloud/loadbalancer-controller" target="_blank" rel="noopener">loadbalancer-controller</a></p>
-<p><strong>April.4 Update:</strong></p>
-<p>尝试使用direct route的方式，lvs节点会绑定VIP的地址，通过flannel overlay网络将用户req发送到后端的pod节点，后端的ingress-nginx这个service需添加externalIPs为VIP的地址，之后我们可以看到kube-proxy在nat表添加了对应的iptables规则</p>
-<p>查看规则</p>
-<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">sudo iptables -t nat -L KUBE-SERVICES -n</span><br></pre></td></tr></table></figure>
-<p>以上步骤与传统的IPVS DR配置模式不同的是并未在ingress-nginx-controller的节点上手动绑定VIP到loopback口，再关闭arp响应操作。</p>
-<p>但是实际在lvs节点抓包显示的情况是这样子的：</p>
-<ul>
-<li>clientIP req -&gt; VIP</li>
-<li>VIP经过NAT将请求从10.244.1.0(cni0)这个口走flannel.1路由到10.244.4.10这个节点的pod</li>
-<li>正常来说10.244.4.10应该是直接经过NAT再返回给client，但是实际上是10.244.4.10返回给10.244.1.0再NAT到VIP，最后返回给了client</li>
-</ul>
-<p>这个难道不就是NAT模式吗…</p>
-<hr>
-<h2 id="开始"><a href="#开始" class="headerlink" title="开始"></a>开始</h2><p>首先需要有一个<code>ingress</code>的服务，因为之前<code>ingress</code>的类型为<code>Deployment</code> ,将泛域名解析到单独一台node节点的话会有单点的问题，需要一点变更</p>
-<h3 id="deployment"><a href="#deployment" class="headerlink" title="deployment"></a>deployment</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">DaemonSet</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">nginx-ingress-controller</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span> </span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  selector:</span></span><br><span class="line"><span class="attr">    matchLabels:</span></span><br><span class="line"><span class="attr">      app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">      annotations:</span></span><br><span class="line">        <span class="string">prometheus.io/port:</span> <span class="string">'10254'</span></span><br><span class="line">        <span class="string">prometheus.io/scrape:</span> <span class="string">'true'</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      serviceAccountName:</span> <span class="string">nginx-ingress-serviceaccount</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">nginx-ingress-controller</span></span><br><span class="line"><span class="attr">          image:</span> <span class="string">quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.9.0</span></span><br><span class="line"><span class="attr">          args:</span></span><br><span class="line"><span class="bullet">            -</span> <span class="string">/nginx-ingress-controller</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--default-backend-service=$(POD_NAMESPACE)/default-http-backend</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--configmap=$(POD_NAMESPACE)/nginx-configuration</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--tcp-services-configmap=$(POD_NAMESPACE)/tcp-services</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--udp-services-configmap=$(POD_NAMESPACE)/udp-services</span></span><br><span class="line"><span class="bullet">            -</span> <span class="bullet">--annotations-prefix=nginx.ingress.kubernetes.io</span></span><br><span class="line"><span class="attr">          env:</span></span><br><span class="line"><span class="attr">            - name:</span> <span class="string">POD_NAME</span></span><br><span class="line"><span class="attr">              valueFrom:</span></span><br><span class="line"><span class="attr">                fieldRef:</span></span><br><span class="line"><span class="attr">                  fieldPath:</span> <span class="string">metadata.name</span></span><br><span class="line"><span class="attr">            - name:</span> <span class="string">POD_NAMESPACE</span></span><br><span class="line"><span class="attr">              valueFrom:</span></span><br><span class="line"><span class="attr">                fieldRef:</span></span><br><span class="line"><span class="attr">                  fieldPath:</span> <span class="string">metadata.namespace</span></span><br><span class="line"><span class="attr">          ports:</span></span><br><span class="line"><span class="attr">          - name:</span> <span class="string">http</span></span><br><span class="line"><span class="attr">            containerPort:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">          - name:</span> <span class="string">https</span></span><br><span class="line"><span class="attr">            containerPort:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">          livenessProbe:</span></span><br><span class="line"><span class="attr">            failureThreshold:</span> <span class="number">3</span></span><br><span class="line"><span class="attr">            httpGet:</span></span><br><span class="line"><span class="attr">              path:</span> <span class="string">/healthz</span></span><br><span class="line"><span class="attr">              port:</span> <span class="number">10254</span></span><br><span class="line"><span class="attr">              scheme:</span> <span class="string">HTTP</span></span><br><span class="line"><span class="attr">            initialDelaySeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            periodSeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            successThreshold:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">            timeoutSeconds:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">          readinessProbe:</span></span><br><span class="line"><span class="attr">            failureThreshold:</span> <span class="number">3</span></span><br><span class="line"><span class="attr">            httpGet:</span></span><br><span class="line"><span class="attr">              path:</span> <span class="string">/healthz</span></span><br><span class="line"><span class="attr">              port:</span> <span class="number">10254</span></span><br><span class="line"><span class="attr">              scheme:</span> <span class="string">HTTP</span></span><br><span class="line"><span class="attr">            periodSeconds:</span> <span class="number">10</span></span><br><span class="line"><span class="attr">            successThreshold:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">            timeoutSeconds:</span> <span class="number">1</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br><span class="line"></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Service</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">  labels:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  ports:</span></span><br><span class="line"><span class="attr">  - name:</span> <span class="string">http</span></span><br><span class="line"><span class="attr">    port:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">    targetPort:</span> <span class="number">80</span></span><br><span class="line"><span class="attr">    protocol:</span> <span class="string">TCP</span></span><br><span class="line"><span class="attr">  - name:</span> <span class="string">https</span></span><br><span class="line"><span class="attr">    port:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">    targetPort:</span> <span class="number">443</span></span><br><span class="line"><span class="attr">    protocol:</span> <span class="string">TCP</span></span><br><span class="line"><span class="attr">  selector:</span></span><br><span class="line"><span class="attr">    app:</span> <span class="string">ingress-nginx</span></span><br></pre></td></tr></table></figure>
-<ul>
-<li>Kind 换成 <code>DaemonSet</code></li>
-<li>去除<code>hostNetwork: true</code></li>
-<li>添加<code>Service</code></li>
-</ul>
-<h3 id="rbac"><a href="#rbac" class="headerlink" title="rbac"></a>rbac</h3><p>基于rbac的认证类型，需要添加<code>sa/clusterrole/clusterrolebinding</code></p>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterRole</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line"><span class="attr">- apiGroups:</span> <span class="string">[""]</span></span><br><span class="line"><span class="attr">  resources:</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">pods</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">nodes</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">endpoints</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">services</span></span><br><span class="line"><span class="bullet">  -</span> <span class="string">configmaps</span></span><br><span class="line"><span class="attr">  verbs:</span> <span class="string">["get",</span> <span class="string">"list"</span><span class="string">,</span> <span class="string">"watch"</span><span class="string">]</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ServiceAccount</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">rbac.authorization.k8s.io/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ClusterRoleBinding</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">roleRef:</span></span><br><span class="line"><span class="attr">  apiGroup:</span> <span class="string">rbac.authorization.k8s.io</span></span><br><span class="line"><span class="attr">  kind:</span> <span class="string">ClusterRole</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">subjects:</span></span><br><span class="line"><span class="attr">- kind:</span> <span class="string">ServiceAccount</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br></pre></td></tr></table></figure>
-<h3 id="configmap"><a href="#configmap" class="headerlink" title="configmap"></a>configmap</h3><p>新建configmap，供kube-keepalived-vip实例在集群中读取配置生成keepalived的配置</p>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">ConfigMap</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">keepalived-vip-configmap</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">data:</span></span><br><span class="line">  <span class="number">172.20</span><span class="number">.10</span><span class="number">.94</span><span class="string">:</span> <span class="string">ingress-nginx/ingress-nginx</span></span><br></pre></td></tr></table></figure>
-<p>data的格式为<code>externalVIP: namespace/svc(:DR|NAT)</code>，括号内为<code>lvs_method</code>，不指定默认为<code>NAT</code>，指明<code>DR</code>的话客户端请求回不来。</p>
-<blockquote>
-<p>DR的话需要在RS的节点的lo网卡绑定vip，配置arp的参数，添加到vip的路由。</p>
-</blockquote>
-<h3 id="keepalived-controller"><a href="#keepalived-controller" class="headerlink" title="keepalived controller"></a>keepalived controller</h3><figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">extensions/v1beta1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">DaemonSet</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line"><span class="attr">  name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">  namespace:</span> <span class="string">ingress-nginx</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line"><span class="attr">  template:</span></span><br><span class="line"><span class="attr">    metadata:</span></span><br><span class="line"><span class="attr">      labels:</span></span><br><span class="line"><span class="attr">        name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">    spec:</span></span><br><span class="line"><span class="attr">      hostNetwork:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">      serviceAccount:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">      containers:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">kube-keepalived-vip</span></span><br><span class="line"><span class="attr">        image:</span> <span class="string">gcr.io/google-containers/kube-keepalived-vip:0.11</span></span><br><span class="line"><span class="attr">        imagePullPolicy:</span> <span class="string">IfNotPresent</span></span><br><span class="line"><span class="attr">        securityContext:</span></span><br><span class="line"><span class="attr">          privileged:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">        volumeMounts:</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/lib/modules</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">modules</span></span><br><span class="line"><span class="attr">          readOnly:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">        - mountPath:</span> <span class="string">/dev</span></span><br><span class="line"><span class="attr">          name:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">        env:</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">POD_NAME</span></span><br><span class="line"><span class="attr">          valueFrom:</span></span><br><span class="line"><span class="attr">            fieldRef:</span></span><br><span class="line"><span class="attr">              fieldPath:</span> <span class="string">metadata.name</span></span><br><span class="line"><span class="attr">        - name:</span> <span class="string">POD_NAMESPACE</span></span><br><span class="line"><span class="attr">          valueFrom:</span></span><br><span class="line"><span class="attr">            fieldRef:</span></span><br><span class="line"><span class="attr">              fieldPath:</span> <span class="string">metadata.namespace</span></span><br><span class="line"><span class="attr">        args:</span></span><br><span class="line"><span class="bullet">        -</span> <span class="bullet">--services-configmap=ingress-nginx/keepalived-vip-configmap</span></span><br><span class="line"><span class="bullet">        -</span> <span class="bullet">-v=9</span></span><br><span class="line"><span class="attr">      volumes:</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">modules</span></span><br><span class="line"><span class="attr">        hostPath:</span></span><br><span class="line"><span class="attr">         path:</span> <span class="string">/lib/modules</span></span><br><span class="line"><span class="attr">      - name:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">        hostPath:</span></span><br><span class="line"><span class="attr">         path:</span> <span class="string">/dev</span></span><br><span class="line"><span class="attr">      nodeSelector:</span></span><br><span class="line"><span class="attr">        ingress-instance:</span> <span class="string">"true"</span></span><br></pre></td></tr></table></figure>
-<p>注意以下没配置正确的话启动会报错</p>
-<ul>
-<li><code>spec.template.spec</code>有<code>serviceAccount: kube-keepalived-vip</code>的配置，不然该实例不能监听到K8S集群内的事件</li>
-<li><code>spec.template.spec.containers[].args</code>需指定上面新建的<code>configmap</code></li>
-</ul>
-<p>检查测试的话，可以查看<code>kube-keepalived-vip-*</code>的pod的log或者是生成的keepalived.conf<br>watch pod状态的话一直Error的话，一般都是有error导致退出，查看log就能找到原因了。</p>
-
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -2306,7 +2280,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">23</span>
+                    <span class="site-state-item-count">24</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
